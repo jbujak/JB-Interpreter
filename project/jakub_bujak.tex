@@ -1,0 +1,162 @@
+\documentclass[a4paper,8pt]{extarticle}
+\usepackage[utf8]{inputenc}
+\usepackage{hyperref}
+\usepackage{amsfonts}
+\usepackage{amssymb}
+\usepackage{amsmath}
+\usepackage{geometry}
+\usepackage{polski}
+\usepackage{pgffor}
+\usepackage{tikz}
+\usepackage{fancyhdr}
+\usepackage[T1]{fontenc}
+\usepackage{mdframed}
+\usepackage{listings}
+\pagestyle{fancy}
+\lhead{Jakub Bujak}
+\rhead{JPP interpreter}
+
+\lstdefinelanguage{my}{
+  morecomment = [l]{//},
+  morestring=[b]", 
+  sensitive = true,
+  classoffset=0, keywordstyle=\color{blue},
+  morekeywords={
+    return, case, of, if, else, while, continue, break, as,
+  },
+  classoffset=1, keywordstyle=\color{purple},
+  morekeywords={
+    void, int, string, record, variant,
+  },
+  alsoletter={:},
+  classoffset=2, keywordstyle=\color{red},
+  keywordsprefix={},
+}
+
+\lstset{
+  language=my,
+  aboveskip=3mm,
+  belowskip=3mm,
+  showstringspaces=false,
+  columns=flexible,
+  basicstyle={\small\ttfamily},
+  numbers=none,
+  numberstyle=\tiny\color{gray},
+  commentstyle=\color{cyan},
+  stringstyle=\color{red},
+  breaklines=true,
+  breakatwhitespace=true,
+  tabsize=4,
+  escapeinside=``
+}
+
+
+\begin{document}
+\section{Grammar}
+\begin{verbatim}
+program = {typedef | function}
+
+typedef = "record" , "{" , {type , identifier , ";"} , "}" , identifier , ";" |
+          "variant" , "{" , {type , identifier , ";"} , "}" , identifier , ";"
+
+function = (type | "void") , identifier , "(" , {type , ["*"] , identifier} , ")" , instruction
+	
+type = "int" | "bool" | "string" | identifier | "[" , type , "]"
+
+instruction = "{" , {instruction} , "}" | function |
+    "if" , "(" , value , ")" , instruction , ["else" , instruction] |
+    "while" , "(" , value , ")" , ["as" , identifier] , instruction |
+    "break" , [identifier] , ";" | "continue" , [identifier] , ";" |
+    "return" , [value] , ";"
+    type , identifier  , ["=" , value] , ";" |
+    lvalue , ("=" | "+=" | "-=" | "*=" | "/=" | "++" | "--") , value , ";" |
+    value , ";" |
+
+value =  lvalue | "(" , value , ")" |
+    integer | "true" | "false" | '"' , string , '"' |
+    value , binary_op , value |
+    unary_op , value |
+    identifier , "(" , {["&"] , identifier} , ")" |
+    "[]" | "[" , {value , ","} , value , "]" |
+    "{" , {identifier , "=" , value , ";"} , "}" |
+    ":" , identifier , "(" , value , ")" |
+    "case" , value , "of" , {"|" , ":" , identifier , "(" , identifier , ")" , "->" , value} |
+
+binary_op = "+" | "-" | "*" | "/" | "==" | ">" | ">=" | "<" | "<=" | "&&" | "||"
+
+unary_op = "!" | "-"
+
+lvalue = identifier | lvalue , "[" , value , "]" | lvalue , "->" , identifier
+\end{verbatim}
+\section{Description}
+My language is C-like imperative language with some extra features. 
+\begin{itemize}
+\item Loops: classic \texttt{while(condition)} loop with optional named label (\texttt{while(condition) as label}), which allows for breaking specific loop.
+\texttt{break;} and \texttt{continue;} instructions modify flow of innermost while loop. \texttt{break label;} and \texttt{continue label;} affect 
+loop named as \texttt{label} (unwrapping call stack if necessary) or result in error if no loop named as \texttt{label} is executed.
+Labels cannot be overriden.
+\item Built-in types: \texttt{int}, \texttt{string} and \texttt{bool}
+\item Built-in functions: \texttt{print(string str)}, \texttt{string int\_to\_string(int n)}, \texttt{string bool\_to\_string(bool b)}
+\item User defined types: \texttt{record} -- like C struct; \texttt{variant} -- tagged union, can be accessed using \texttt{case ... of} construction, similarly to Haskell
+\item Functions: can be \texttt{void} or return value of specific type.
+Arguments can be passed by value (\texttt{void f(int a)}) or by reference (\texttt{void f(int *a)}).
+Functions can be arbitralily nested and called recursively.
+\item Variables: only staticly typed variables are allowed. Variables are staticly bound with usual override semantics.
+Variables within blocks are accesible only from within that block. Variables outside all blocks are global variables, accesible after declaration from any instruction.
+\item Comments: start with \texttt{//} and ends with end of line
+\end{itemize}
+\newpage
+\section{Example program}
+\begin{lstlisting}
+record {
+    int number;
+    [int] array;
+    my_variant var;
+} my_record;
+
+variant {
+    int number_case;
+    bool boolean_case;
+} my_variant;
+
+int while_example() {
+    int res = 0;
+    int while_example_inner() {
+        while (true) as inner {
+            res++;
+            if (res == 5) break inner;
+            if (res == 10) break outer;
+        }
+    }
+    while (true) as outer {
+        while_example_inner();
+    }
+    return res;
+}
+
+void main() {
+    void print_variant(my_variant v) {
+         string str = case v of
+             | :number_case(n) -> ":number_case(" + int_to_string(n) + ")"
+             | :boolean_case(b) -> ":boolean_case(" + bool_to_string(b) + ")";
+        print(str);
+    }
+
+    void negate_variant(my_variant *v) {
+        v = case v of
+            | :number_case(n) -> :number_case(-n)
+            | :boolean_case(b) -> :boolean_case(!b);
+    }
+
+    my_record a = {
+        number = 42;
+        array = [1, 2];
+        var = :number_case(1);
+    };
+    a->array[0]++;
+    negate_variant(&(a->var));
+    print_variant(a->var); // output: ":number_case(-1)"
+    print(int_to_string(while_example())); //output: "10"
+}
+\end{lstlisting}
+\end{document}
