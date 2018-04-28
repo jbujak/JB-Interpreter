@@ -1,0 +1,177 @@
+-- programs ------------------------------------------------
+
+entrypoints Program ;
+
+Program.    Program ::= [TopDef] ;
+
+TypeFnDef.  TopDef ::= Type Ident "(" [Arg] ")" Block ;
+
+VoidFnDef.  TopDef ::= "void" Ident "(" [Arg] ")" Block ;
+
+separator nonempty TopDef "" ;
+
+Arg. 	    Arg ::= Type Ident;
+
+separator   Arg "," ;
+
+-- statements ----------------------------------------------
+
+Block.      Block ::= "{" [Cmd] "}" ;
+
+separator   Cmd "" ;
+
+BCmd.       Cmd ::= Block ;
+
+FCmd.       Cmd ::= TopDef ;
+
+Cond.       Cmd ::= "if" "(" Val ")" Cmd  ;
+
+CondElse.   Cmd ::= "if" "(" Val ")" Cmd "else" Cmd  ;
+
+While.      Cmd ::= "while" "(" Val ")" Cmd ;
+
+WhileAs.    Cmd ::= "while" "(" Val ")" "as" Ident Cmd ;
+
+Break.      Cmd ::= "break;" ;
+
+BreakL.     Cmd ::= "break" Ident ";" ;
+
+Continue.   Cmd ::= "continue;" ;
+
+ContinueL.  Cmd ::= "continue" Ident ";" ;
+
+Ret.        Cmd ::= "return" Val ";" ;
+
+VRet.       Cmd ::= "return" ";" ;
+
+Decl.       Cmd ::= Type Item ";" ;
+
+NoInit.     Item ::= Ident ; 
+
+Init.       Item ::= Ident "=" Val ;
+
+BinMod.     Cmd ::= LVal BinModOp Val  ";" ;
+
+UnMod.      Cmd ::= LVal UnModOp ";" ;
+
+ValCmd.     Cmd ::= Val ";" ;
+
+-- Types ---------------------------------------------------
+
+Int.        Type ::= "int" ;
+
+Bool.       Type ::= "bool" ;
+
+Str.        Type ::= "string" ;
+
+UserType.   Type ::= Ident ;
+
+Array.      Type ::= "[" Type "]" ;
+
+-- Values --------------------------------------------------
+ELval.      Val6 ::= LVal ;
+
+EVar.       Val6 ::= Var ;
+
+ELitInt.    Val6 ::= Integer ;
+
+ELitTrue.   Val6 ::= "true" ;
+
+ELitFalse.  Val6 ::= "false" ;
+
+EString.    Val6 ::= String ;
+
+EApp.       Val6 ::= Ident "(" [Arg] ")" ;
+
+EArr.       Val6 ::= "[" [Val] "]" ;
+
+ERec.       Val6 ::= "<" [RecEntry] ">" ;
+
+Neg.        Val5 ::= "-" Val6 ;
+
+Not.        Val5 ::= "!" Val6 ;
+
+EMul.       Val4 ::= Val4 MulOp Val5 ;
+
+EAdd.       Val3 ::= Val3 AddOp Val4 ;
+
+ERel.       Val2 ::= Val2 RelOp Val3 ;
+
+EAnd.       Val1 ::= Val2 "&&" Val1 ;
+
+EOr.        Val ::= Val1 "||" Val ;
+
+ECase.      Val ::= "case" Val "of" [CaseEntry] ;
+
+Var.        Var ::= ":" Ident "(" Val ")" ;
+
+ArgVal.     Arg ::= Val ;
+
+ArgRef.     Arg ::= "&" Val ;
+
+RecEntry.   RecEntry ::= "." Ident "=" Val ;
+
+CaseEntry.  CaseEntry ::= "|" Var "->" Val ;
+
+coercions   Val 6 ;
+
+separator   Val "," ;
+
+terminator  RecEntry ";" ;
+
+separator   CaseEntry "," ;
+
+-- Left values ---------------------------------------------
+
+LVar.       LVal ::= Ident ;
+
+LArr.       LVal ::= LVal "[" Val "]" ;
+
+LRec.       LVal ::= LVal "->" Ident ;
+
+-- operators -----------------------------------------------
+
+Plus.       AddOp ::= "+" ;
+
+Minus.      AddOp ::= "-" ;
+
+Times.      MulOp ::= "*" ;
+
+Div.        MulOp ::= "/" ;
+
+Mod.        MulOp ::= "%" ;
+
+LTH.        RelOp ::= "<" ;
+
+LE.         RelOp ::= "<=" ;
+
+GTH.        RelOp ::= ">" ;
+
+GE.         RelOp ::= ">=" ;
+
+EQU.        RelOp ::= "==" ;
+
+NE.         RelOp ::= "!=" ;
+
+AssOp.      BinModOp ::= "=" ;
+
+PlusEq.     BinModOp ::= "+=" ;
+
+MinusEq.    BinModOp ::= "-=" ;
+
+TimesEq.    BinModOp ::= "*=" ;
+
+DivEq.      BinModOp ::= "/=" ;
+
+Inc.        UnModOp ::= "++" ;
+
+Dec.        UnModOp ::= "--" ;
+
+-- comments ------------------------------------------------
+
+comment    "#" ;
+
+comment    "//" ;
+
+comment    "/*" "*/" ;
+
