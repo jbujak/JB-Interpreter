@@ -1,0 +1,43 @@
+int main() {
+	int i = 0;
+	while (i < 10) {
+		i++;
+		if (i == 6) break;
+		print(int_to_string(i));
+	}
+	print("");
+
+	i = 0;
+	while (i < 4) {
+		i++;
+		if (i == 3) continue;
+		print(int_to_string(i));
+	}
+	print("");
+
+	i = 0;
+	while (i < 10) as outer {
+		i++;
+		int j = 0;
+		while (j < 10) as inner {
+			j++;
+			print(int_to_string(i) + ":" + int_to_string(j));
+			if (j == 3) break inner;
+			if (i == 2) break outer;
+		}
+	}
+	print("");
+
+	i = 0;
+	while (i < 2) as outer {
+		i++;
+        int j = 0;
+		while (j < 4) as inner {
+			j++;
+			print(int_to_string(i) + ":" + int_to_string(j));
+			if (j == 2) continue inner;
+			if (j == 3) continue outer;
+			print(int_to_string(i) + ":" + int_to_string(j));
+		}
+	}
+}

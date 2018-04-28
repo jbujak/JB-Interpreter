@@ -14,6 +14,8 @@ import AbsGrammar
 data SVar = VInt Integer | VBool Bool | VString String | VVoid | VArr [SVar] |
         VRec [(String, SVar)] | VVar String SVar deriving Show
 
+data BreakContinue = BCNone | BNearest | CNearest | BLabel String | CLabel String
+
 type Loc = Integer
 type Fun = ([SVar] -> SVar)
 
@@ -25,7 +27,8 @@ data ExecState = ExecState {
     vEnv :: VEnv,
     store :: Store,
     output :: String,
-    location :: Integer
+    location :: Integer,
+    breakContinue :: BreakContinue
 }
 
 data Result a = Result a | Error String String
@@ -42,7 +45,6 @@ instance Applicative Result where
     (<*>) = ap
 
 type Interp a = (StateT ExecState Result) a
-
 
 -- Framework for running interpreter
 
@@ -80,7 +82,13 @@ runInterp :: Interp () -> Result String
 runInterp m = fmap (output . snd) $ runStateT m emptyExecState
 
 emptyExecState :: ExecState
-emptyExecState = ExecState {vEnv = [], store = [], output = "", location = 0}
+emptyExecState = ExecState {
+    vEnv = [],
+    store = [],
+    output = "",
+    location = 0,
+    breakContinue = BCNone
+}
 
 -- Interpreting top-level structures
 
@@ -100,9 +108,9 @@ interpretTopDef (VariantDef _ _) = return ()
 -- Interpreting statements
 
 interpretStmt :: Stmt -> Interp ()
-interpretStmt (BStmt (Block cmds)) = do
+interpretStmt (BStmt (Block stmts)) = do
     env <- gets vEnv
-    forM_ cmds interpretStmt
+    executeStmts stmts
     modify $ \s -> s { vEnv = env }
 
 interpretStmt (FStmt funDef) = reportError "Not yet implemented FStmt"
@@ -115,17 +123,34 @@ interpretStmt (CondElse cond ifStmt elseStmt) = do
     condBool <- calculateBool cond
     interpretStmt $ if condBool then ifStmt else elseStmt
 
-interpretStmt (While cond stmt) = reportError "Not yet implemented While"
+interpretStmt while @ (While cond stmt) = do
+    condBool <- calculateBool cond
+    breakContinue <- gets breakContinue
+    case breakContinue of
+        BCNone -> if condBool then interpretStmt stmt >> interpretStmt while else return ()
+        BNearest -> modify $ \s -> s { breakContinue = BCNone }
+        CNearest -> (modify $ \s -> s { breakContinue = BCNone }) >> interpretStmt while
+        _ -> return ()
 
-interpretStmt (WhileAs cond label stmt) = reportError "Not yet implemented WhileAs"
+interpretStmt while @ (WhileAs cond (Ident label) stmt) = do
+    condBool <- calculateBool cond
+    breakContinue <- gets breakContinue
+    case breakContinue of
+        BCNone -> if condBool then interpretStmt stmt >> interpretStmt while else return ()
+        BNearest -> break
+        CNearest -> continue
+        BLabel bLabel -> if label == bLabel then break else return ()
+        CLabel cLabel -> if label == cLabel then continue else return ()
+    where break = modify $ \s -> s { breakContinue = BCNone }
+          continue = (modify $ \s -> s { breakContinue = BCNone }) >> interpretStmt while
 
-interpretStmt  Break = reportError "Not yet implemented Break"
+interpretStmt  Break = modify $ \s -> s { breakContinue = BNearest }
 
-interpretStmt (BreakL label) = reportError "Not yet implemented BreakL"
+interpretStmt (BreakL (Ident label)) = modify $ \s -> s { breakContinue = BLabel label }
 
-interpretStmt  Continue = reportError "Not yet implemented Continue"
+interpretStmt  Continue = modify $ \s -> s { breakContinue = CNearest }
 
-interpretStmt (ContinueL label) = reportError "Not yet implemented ContinueL"
+interpretStmt (ContinueL (Ident label)) = modify $ \s -> s { breakContinue = CLabel label }
 
 interpretStmt (Ret val) = reportError "Not yet implemented Ret"
 
@@ -165,6 +190,14 @@ interpretStmt (UnMod lval op) = modifyLVal lval (modifyInt funMod) where
 
 interpretStmt (ValStmt val) = interpretVal val >> return ()
 
+executeStmts :: [Stmt] -> Interp ()
+executeStmts stmts = foldr (\m -> \f -> do
+        breakContinue <- gets breakContinue
+        case breakContinue of
+            BCNone -> m >> f
+            _ -> return ()
+        ) (return ()) (map interpretStmt stmts)
+
 -- Interpreting values
 
 interpretVal :: Val -> Interp SVar
@@ -184,7 +217,7 @@ interpretVal (EString str) = return $ VString str
 
 interpretVal (EApp (Ident funName) args) = if isBuiltIn funName
     then executeBuiltIn funName args
-    else reportError "Not yet implemented EApp"
+    else reportError $ "Not yet implemented EApp " ++ funName
 
 interpretVal (EArr arr) = do
     values <- mapM interpretVal arr
