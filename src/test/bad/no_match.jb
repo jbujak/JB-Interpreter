@@ -1,0 +1,9 @@
+variant {
+	int a;
+} my_variant;
+
+int main() {
+	my_variant v = :a(1);
+	case v of
+		| :b(n) -> "a";
+}

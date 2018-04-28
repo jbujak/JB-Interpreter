@@ -12,7 +12,7 @@ import AbsGrammar
 -- Type definitions
 
 data SVar = VInt Integer | VBool Bool | VString String | VVoid | VArr [SVar] |
-        VRec [(String, SVar)] deriving Show
+        VRec [(String, SVar)] | VVar String SVar deriving Show
 
 type Loc = Integer
 type Fun = ([SVar] -> SVar)
@@ -94,6 +94,8 @@ interpretTopDef (TypeFnDef funType (Ident funName) args (Block cmds)) = return (
 
 interpretTopDef (RecordDef _ _) = return ()
 
+interpretTopDef (VariantDef _ _) = return ()
+
 
 -- Interpreting statements
 
@@ -161,7 +163,9 @@ interpretStmt (ValStmt val) = interpretVal val >> return ()
 interpretVal :: Val -> Interp SVar
 interpretVal (ELVal lval) = calculateLVal lval
 
-interpretVal (EVar (Var label val)) = reportError "Not yet implemented EVar"
+interpretVal (EVar (Var (Ident label) val)) = do
+    var <- interpretVal val
+    return $ VVar label var
 
 interpretVal (ELitInt n) = return $ VInt n
 
@@ -236,12 +240,26 @@ interpretVal (EBoolOp lhs op rhs) = do
         And  -> return $ VBool (lhsBool && rhsBool)
         Or   -> return $ VBool (lhsBool || rhsBool)
 
-interpretVal (ECase val cases) = reportError "Not yet implemented ECase"
+interpretVal (ECase val cases) = do
+    var <- interpretVal val
+    case var of
+        VVar label varValue -> case findCase label cases of
+            Nothing -> reportError "non-exhaustive pattern in case"
+            Just (CaseEntry (VarEntry (Ident caseLabel) (Ident varName)) resVal) -> do
+                setVar varName (Just varValue)
+                interpretVal resVal
+        _ -> reportError "case argument must be variant"
 
 interpretRecEntry :: RecEntry -> Interp (String, SVar)
 interpretRecEntry (RecEntry (Ident label) val) = do
     var <- interpretVal val
     return (label, var)
+
+findCase :: String -> [CaseEntry] -> Maybe CaseEntry
+findCase _ [] = Nothing
+findCase label (c @ (CaseEntry (VarEntry (Ident caseLabel) (Ident var)) _):cases) =
+    if label == caseLabel then return c
+    else findCase label cases
 
 -- LValue handling
 

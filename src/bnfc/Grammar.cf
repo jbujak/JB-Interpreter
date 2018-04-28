@@ -10,6 +10,8 @@ VoidFnDef.  TopDef ::= "void" Ident "(" [Arg] ")" Block ;
 
 RecordDef.  TopDef ::= "record" "{" [TypeEntry] "}" Ident ";";
 
+VariantDef. TopDef ::= "variant" "{" [TypeEntry] "}" Ident ";";
+
 TypeEntry.  TypeEntry ::= Type Ident ;
 
 terminator nonempty TypeEntry ";" ;
@@ -115,7 +117,9 @@ ArgRef.     Arg ::= "&" Val ;
 
 RecEntry.   RecEntry ::= Ident "=" Val ;
 
-CaseEntry.  CaseEntry ::= "|" Var "->" Val ;
+CaseEntry.  CaseEntry ::= "|" VarEntry "->" Val ;
+
+VarEntry.   VarEntry ::= ":" Ident "(" Ident ")" ;
 
 coercions   Val 6 ;
 
@@ -123,7 +127,7 @@ separator   Val "," ;
 
 terminator  RecEntry ";" ;
 
-separator   CaseEntry "," ;
+separator   CaseEntry "" ;
 
 -- Left values ---------------------------------------------
 
