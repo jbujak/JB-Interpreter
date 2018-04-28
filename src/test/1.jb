@@ -1,0 +1,5 @@
+int main() {
+	print("napis");
+	print(int_to_string(123));
+	print(bool_to_string(true));
+}
