@@ -3,6 +3,7 @@
 *.hs
 *.x
 *.y
+*.bak
 src/bnfc/DocGrammar.txt
 src/bnfc/Makefile
 src/bnfc/TestGrammar
