@@ -17,7 +17,12 @@ do
         echo -e $file ${GREEN}OK${RESET}
     else
         echo -e $file ${RED}ERROR${RESET}
-        cat out
+	for line in $(cat out)
+	do
+		echo -n -e '\t'
+		echo $line
+	done
+	echo -n -e '\t'
         cat err
     fi
     rm out
