@@ -1,0 +1,41 @@
+int main() {
+	print(int_to_string(-1));
+	print(int_to_string(1));
+	print(int_to_string(1 + 1));
+	print(int_to_string(5 - 2));
+	print(int_to_string(2 * 2));
+	print(int_to_string(10 / 2));
+	print(int_to_string(26 % 10));
+	print("");
+
+    print(bool_to_string(!false));
+    print(bool_to_string(!true));
+	print("");
+
+	print(bool_to_string(1 == 1));
+	print(bool_to_string(1 == 2));
+	print("");
+
+	print(bool_to_string(1 != 2));
+	print(bool_to_string(1 != 1));
+	print("");
+
+	print(bool_to_string(2 > 1));
+	print(bool_to_string(1 > 1));
+	print(bool_to_string(0 > 1));
+	print("");
+
+	print(bool_to_string(1 < 2));
+	print(bool_to_string(1 < 1));
+	print(bool_to_string(1 < 0));
+	print("");
+
+	print(bool_to_string(2 >= 1));
+	print(bool_to_string(1 >= 1));
+	print(bool_to_string(0 >= 1));
+	print("");
+
+	print(bool_to_string(1 <= 2));
+	print(bool_to_string(1 <= 1));
+	print(bool_to_string(1 <= 0));
+}

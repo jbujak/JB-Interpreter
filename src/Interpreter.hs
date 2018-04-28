@@ -97,17 +97,43 @@ interpretVal (EApp (Ident funName) args) = if isBuiltIn funName
     else reportError "Not yet implemented EApp"
 interpretVal (EArr arr) = reportError "Not yet implemented EArr"
 interpretVal (ERec rec) = reportError "Not yet implemented ERec"
+
 interpretVal (Neg arg) = do
-    argVal <- interpretVal arg
-    argInt <- getInt argVal
+    argInt <- calculateInt arg
     return $ VInt (-1 * argInt)
+
 interpretVal (Not arg) = do
-    argVal <- interpretVal arg
-    argBool <- getBool argVal
+    argBool <- calculateBool arg
     return $ VBool (not argBool)
-interpretVal (EMul lhs op rhs) = reportError "Not yet implemented EMul"
-interpretVal (EAdd lhs op rhs) = reportError "Not yet implemented EAdd"
-interpretVal (ERel lhs op rhs) = reportError "Not yet implemented ERel"
+
+interpretVal (EMul lhs op rhs) = do
+    lhsInt <- calculateInt lhs
+    rhsInt <- calculateInt rhs
+    case op of
+        Times -> return $ VInt (lhsInt * rhsInt)
+        Mod   -> if rhsInt == 0 then reportError "Cannot divide by zero"
+                                else return $ VInt (lhsInt `mod` rhsInt)
+        Div   -> if rhsInt == 0 then reportError "Cannot divide by zero"
+                                else return $ VInt (lhsInt `div` rhsInt)
+
+interpretVal (EAdd lhs op rhs) = do
+    lhsInt <- calculateInt lhs
+    rhsInt <- calculateInt rhs
+    case op of
+        Plus  -> return $ VInt (lhsInt + rhsInt)
+        Minus -> return $ VInt (lhsInt - rhsInt)
+
+interpretVal (ERel lhs op rhs) = do
+    lhsInt <- calculateInt lhs
+    rhsInt <- calculateInt rhs
+    case op of
+        LTH -> return $ VBool(lhsInt < rhsInt)
+        LE  -> return $ VBool(lhsInt <= rhsInt)
+        GTH -> return $ VBool(lhsInt > rhsInt)
+        GE  -> return $ VBool(lhsInt >= rhsInt)
+        EQU -> return $ VBool(lhsInt == rhsInt)
+        NE  -> return $ VBool(lhsInt /= rhsInt)
+
 interpretVal (EAnd lhs rhs) = reportError "Not yet implemented EAnd"
 interpretVal (EOr lhs rhs) = reportError "Not yet implemented EOr"
 interpretVal (ECase val cases) = reportError "Not yet implemented ECase"
@@ -142,6 +168,12 @@ executeBuiltIn "bool_to_string" args = case args of
 
 
 -- Helper functions
+calculateInt :: Val -> Interp Integer
+calculateInt val = interpretVal val >>= getInt
+
+calculateBool :: Val -> Interp Bool
+calculateBool val = interpretVal val >>= getBool
+
 getInt :: SVar -> Interp Integer
 getInt (VInt n) = return n
 getInt var = reportError $ "expected int instead of " ++ (show var)
