@@ -17,3 +17,7 @@ clean:
 	-rm *.o 2>/dev/null
 	-rm $(OUT) 2>/dev/null
 
+tags: *.hs
+	hasktags .
+	rm TAGS
+	mv ctags tags

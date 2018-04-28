@@ -8,3 +8,4 @@ src/bnfc/Makefile
 src/bnfc/TestGrammar
 interpreter
 example.jb
+tags
