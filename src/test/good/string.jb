@@ -1,0 +1,8 @@
+int main() {
+	string s = "";
+	s = "a" + "b";
+	s += "c";
+	print(s);
+	string t = "d";
+	print(s + t);
+}

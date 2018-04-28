@@ -132,12 +132,18 @@ interpretStmt (BinMod lval AssOp arg) = do
     val <- interpretVal arg
     modifyLVal lval (\_ -> return val)
 
+interpretStmt (BinMod lval PlusEq rval) = do
+    val <- interpretVal rval
+    case val of 
+        VInt valInt       -> modifyLVal lval $ modifyInt (+valInt)
+        VString valString -> modifyLVal lval $ modifyString (++valString) 
+        _                 -> reportError "oprator += can be used with int or string"
+
 interpretStmt (BinMod lval op val) = do
     valInt <- calculateInt val
     if op == DivEq && valInt == 0 then reportError "Cannot divide by zero"
     else modifyLVal lval $ modifyInt (funMod valInt) where
         funMod valInt = case op of
-            PlusEq -> (valInt+)
             MinusEq -> \n -> n - valInt
             TimesEq -> (valInt*)
             DivEq -> \n -> n `div` valInt
@@ -195,12 +201,22 @@ interpretVal (EMul lhs op rhs) = do
         Div   -> if rhsInt == 0 then reportError "Cannot divide by zero"
                                 else return $ VInt (lhsInt `div` rhsInt)
 
-interpretVal (EAdd lhs op rhs) = do
+interpretVal (EAdd lhs Plus rhs) = do
+    lhsVal <- interpretVal lhs
+    rhsVal <- interpretVal rhs
+    case lhsVal of
+        VInt lhsInt -> do
+            rhsInt <- getInt lhsVal
+            return $ VInt (lhsInt + rhsInt)
+        VString lhsString -> do
+            rhsString <- getString rhsVal
+            return $ VString(lhsString ++ rhsString)
+        _ -> reportError "oprator + can be used with int or string"
+
+interpretVal (EAdd lhs Minus rhs) = do
     lhsInt <- calculateInt lhs
     rhsInt <- calculateInt rhs
-    case op of
-        Plus  -> return $ VInt (lhsInt + rhsInt)
-        Minus -> return $ VInt (lhsInt - rhsInt)
+    return $ VInt (lhsInt - rhsInt)
 
 interpretVal (ERel lhs op rhs) = do
     lhsInt <- calculateInt lhs
@@ -314,6 +330,11 @@ modifyInt :: (Integer -> Integer) -> SVar -> Interp SVar
 modifyInt f var = do
     int <- getInt var
     return $ VInt (f int)
+
+modifyString :: (String -> String) -> SVar -> Interp SVar
+modifyString f var = do
+    string <- getString var
+    return $ VString (f string)
 
 getBool :: SVar -> Interp Bool
 getBool (VBool b) = return b
