@@ -11,7 +11,7 @@ do
     then expected_code=1
     else expected_code=0
     fi
-    if $(diff $file.out out) && [ $code = $expected_code ]
+    if diff $file.out out 2>&1 >/dev/null && [ $code = $expected_code ]
     then
         echo -e $file ${GREEN}OK${NC}
     else
