@@ -80,6 +80,35 @@ interpretTopDef (TypeFnDef funType (Ident funName) args (Block cmds)) = return (
 
 interpretStmt :: Stmt -> Interp ()
 interpretStmt (BStmt (Block cmds)) = forM_ cmds interpretStmt
+
+interpretStmt (FStmt funDef) = reportError "Not yet implemented FStmt"
+
+interpretStmt (Cond cond ifStmt) = reportError "Not yet implemented Cond"
+
+interpretStmt (CondElse cond ifStmt elseStmt) = reportError "Not yet implemented CondElse"
+
+interpretStmt (While cond stmt) = reportError "Not yet implemented While"
+
+interpretStmt (WhileAs cond label stmt) = reportError "Not yet implemented WhileAs"
+
+interpretStmt  Break = reportError "Not yet implemented Break"
+
+interpretStmt (BreakL label) = reportError "Not yet implemented BreakL"
+
+interpretStmt  Continue = reportError "Not yet implemented Continue"
+
+interpretStmt (ContinueL label) = reportError "Not yet implemented ContinueL"
+
+interpretStmt (Ret val) = reportError "Not yet implemented Ret"
+
+interpretStmt VRet = reportError "Not yet implemented VRet"
+
+interpretStmt (Decl iType item) = reportError "Not yet implemented Decl"
+
+interpretStmt (BinMod lhs op rhs) = reportError "Not yet implemented BinMod"
+
+interpretStmt (UnMod lhs op) = reportError "Not yet implemented UnMod"
+
 interpretStmt (ValStmt val) = interpretVal val >> return ()
 
 
@@ -139,7 +168,7 @@ interpretVal (EBoolOp lhs op rhs) = do
     rhsBool <- calculateBool rhs
     case op of
         And  -> return $ VBool (lhsBool && rhsBool)
-        Or  -> return $ VBool (lhsBool || rhsBool)
+        Or   -> return $ VBool (lhsBool || rhsBool)
 
 interpretVal (ECase val cases) = reportError "Not yet implemented ECase"
 
