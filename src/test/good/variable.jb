@@ -1,10 +1,26 @@
 int main() {
 	int x = 1;
+	string y = "a";
+	bool z = true;
+
+	print(int_to_string(x));
+	print(y);
+	print(bool_to_string(z));
+
+	x++;
+	print(int_to_string(x));
+	x--;
 	print(int_to_string(x));
 
-	string y = "a";
-	print(y);
+	x += 5;
+	print(int_to_string(x));
+	x -= 5;
+	print(int_to_string(x));
+	x *= 4;
+	print(int_to_string(x));
+	x /= 4;
+	print(int_to_string(x));
 
-	bool z = true;
-	print(bool_to_string(z));
+	x = 100;
+	print(int_to_string(x));
 }

@@ -123,12 +123,27 @@ interpretStmt (VarDecl _ item) = case item of
         res <- interpretVal val
         setVar name (Just res)
 
-interpretStmt (BinMod lhs op rhs) = reportError "Not yet implemented BinMod"
+interpretStmt (BinMod lval AssOp arg) = do
+    val <- interpretVal arg
+    modifyLVal lval (\_ -> return val)
 
-interpretStmt (UnMod lhs op) = reportError "Not yet implemented UnMod"
+interpretStmt (BinMod lval op val) = do
+    valInt <- calculateInt val
+    if op == DivEq && valInt == 0 then reportError "Cannot divide by zero"
+    else modifyLVal lval $ modifyInt (funMod valInt) where
+        funMod valInt = case op of
+            PlusEq -> (valInt+)
+            MinusEq -> \n -> n - valInt
+            TimesEq -> (valInt*)
+            DivEq -> \n -> n `div` valInt
+
+interpretStmt (UnMod lval op) = modifyLVal lval (modifyInt funMod) where
+    funMod = case op of
+        Inc -> (1+)
+        Dec -> ((-1)+)
+
 
 interpretStmt (ValStmt val) = interpretVal val >> return ()
-
 
 -- Interpreting values
 
@@ -202,6 +217,18 @@ interpretVal (EBoolOp lhs op rhs) = do
 
 interpretVal (ECase val cases) = reportError "Not yet implemented ECase"
 
+-- Lvalue handling
+
+modifyLVal :: LVal -> (SVar -> Interp SVar) -> Interp ()
+modifyLVal (LVar (Ident name)) f = do
+    var    <- getVar name
+    newVar <- f var
+    setVar name (Just newVar)
+
+modifyLVal (LArr arr index) f = reportError "Not yet implemented LArr"
+
+modifyLVal (LRec record (Ident field)) f = reportError "Not yet implemented LRec"
+
 -- Built-in functions handling
 
 isBuiltIn :: String -> Bool
@@ -241,6 +268,11 @@ calculateBool val = interpretVal val >>= getBool
 getInt :: SVar -> Interp Integer
 getInt (VInt n) = return n
 getInt var = reportError $ "expected int instead of " ++ (show var)
+
+modifyInt :: (Integer -> Integer) -> SVar -> Interp SVar
+modifyInt f var = do
+    int <- getInt var
+    return $ VInt (f int)
 
 getBool :: SVar -> Interp Bool
 getBool (VBool b) = return b
