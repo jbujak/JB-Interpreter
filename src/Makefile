@@ -9,6 +9,11 @@ ParGrammar.hs: bnfc/Grammar.cf
 	cd bnfc && bnfc -m --haskell Grammar.cf && $(MAKE)
 	cp bnfc/{$(GRAMMAR_FILES)} ./
 
+tags: *.hs
+	hasktags .
+	rm TAGS
+	mv ctags tags
+
 .PHONY: clean
 clean:
 	-cd bnfc && $(MAKE) distclean
@@ -17,7 +22,6 @@ clean:
 	-rm *.o 2>/dev/null
 	-rm $(OUT) 2>/dev/null
 
-tags: *.hs
-	hasktags .
-	rm TAGS
-	mv ctags tags
+.PHONY: test
+test:
+	cd test && ./test.sh
