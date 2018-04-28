@@ -1,4 +1,5 @@
 import System.IO
+import System.Exit
 import System.Environment
 
 import Control.Monad.State
@@ -8,7 +9,7 @@ import PrintGrammar
 import ErrM
 import AbsGrammar
 
-data SVar = VInt Int | VBool Bool | VString String
+data SVar = VInt Int | VBool Bool | VString String | VVoid
 type Loc = Int
 type Fun = ([SVar] -> SVar)
 
@@ -22,7 +23,7 @@ data ExecState = ExecState {
     output :: String
 }
 
-type Interp = (StateT ExecState Err) ()
+type Interp a = (StateT ExecState Err) a
 
 main :: IO ()
 main = do
@@ -35,8 +36,10 @@ main = do
 
 execute :: String -> IO ()
 execute code = case tryExecute code of
-    Ok s  -> do putStrLn s
-    Bad s -> do putStrLn $ "Error: " ++ s
+    Ok s  -> putStrLn s
+    Bad s -> do
+        putStrLn $ "Error: " ++ s
+        exitWith $ ExitFailure 1
 
 tryExecute :: String -> Err String
 tryExecute s = do
@@ -49,33 +52,39 @@ parse str = pProgram $ myLexer str
 
 -- Interpreting top-level structures
 
-interpretProgram :: Program -> Interp
+interpretProgram :: Program -> Interp ()
 interpretProgram (Program topDefs) = forM_ topDefs interpretTopDef
 
-interpretTopDef :: TopDef -> Interp
-interpretTopDef f @ (TypeFnDef funType (Ident funName) args (Block cmds)) = if funName == "main" then
-    do
-        forM_ cmds interpretStmt
-    else
-        --TODO add to FEnv
-        return ()
+interpretTopDef :: TopDef -> Interp ()
+interpretTopDef (TypeFnDef funType (Ident "main") args (Block cmds)) = forM_ cmds interpretStmt
+interpretTopDef (TypeFnDef funType (Ident funName) args (Block cmds)) = return () --TODO
 
 
 -- Interpreting statements
 
-interpretStmt :: Stmt -> Interp
+interpretStmt :: Stmt -> Interp ()
 interpretStmt (BStmt (Block cmds)) = forM_ cmds interpretStmt
-interpretStmt (ValStmt (EApp (Ident funName) (arg:[]))) = if funName == "print"
-    then printToOutput "print"
-    else return ()
+interpretStmt (ValStmt val) = interpretVal val >> return ()
 
+
+-- Interpreting values
+
+interpretVal :: Val -> Interp SVar
+interpretVal (EApp (Ident "print") args) = case args of
+    (arg:[]) -> do
+        printToOutput "print"
+        return VVoid
+    _ -> reportError "print() call should have exactly one argument"
 
 -- Helper functions
 
-printToOutput :: String -> Interp
+printToOutput :: String -> Interp ()
 printToOutput str = modify $ \s -> s {output = (output s) ++ str ++ "\n"}
+
+reportError :: String -> Interp a
+reportError msg = StateT { runStateT = \s -> Bad msg }
     
-runInterp :: Interp -> Err String
+runInterp :: Interp () -> Err String
 runInterp m = fmap (output . snd) $ runStateT m emptyExecState
 
 emptyExecState :: ExecState
