@@ -1,5 +1,4 @@
 int main() {
 	print(bool_to_string(true));
 	print(bool_to_string(false));
-	bool_to_string(1);
 }

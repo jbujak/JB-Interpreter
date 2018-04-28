@@ -3,14 +3,12 @@ RED='\033[0;31m'
 GREEN='\033[0;32m'
 NC='\033[0m'
 
-for file in $(ls *.jb)
+echo "Good programs tests"
+for file in $(ls good/*.jb)
 do
     ../interpreter $file >out 2>err
     code=$?
-    if [ -f $file.err ]
-    then expected_code=1
-    else expected_code=0
-    fi
+    expected_code=0
     if diff $file.out out 2>&1 >/dev/null && [ $code = $expected_code ]
     then
         echo -e $file ${GREEN}OK${NC}
@@ -18,6 +16,24 @@ do
         echo -e $file ${RED}ERROR${NC}
         cat out
         cat err
+    fi
+    rm out
+    rm err
+done
+
+echo "Bad programs tests"
+for file in $(ls bad/*.jb)
+do
+    ../interpreter $file >out 2>err
+    code=$?
+    expected_code=1
+    if [ $code = $expected_code ]
+    then
+        echo -e $file ${GREEN}OK${NC}
+	echo -n -e '\t'
+        cat err
+    else
+        echo -e $file ${RED}ERROR${NC}
     fi
     rm out
     rm err

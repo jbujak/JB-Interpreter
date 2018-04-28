@@ -1,0 +1,3 @@
+int main() {
+	bool_to_string("a");
+}
