@@ -16,6 +16,8 @@ do
         echo -e $file ${GREEN}OK${NC}
     else
         echo -e $file ${RED}ERROR${NC}
+        cat out
+        cat err
     fi
     rm out
     rm err
