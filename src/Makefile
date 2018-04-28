@@ -1,0 +1,19 @@
+SHELL=/bin/bash
+GRAMMAR_FILES=ParGrammar.hs,PrintGrammar.hs,AbsGrammar.hs,LexGrammar.hs,ErrM.hs
+OUT=interpreter
+
+interpreter: ParGrammar.hs Interpreter.hs
+	ghc Interpreter.hs -o $(OUT)
+
+ParGrammar.hs: bnfc/Grammar.cf
+	cd bnfc && bnfc -m --haskell Grammar.cf && $(MAKE)
+	cp bnfc/{$(GRAMMAR_FILES)} ./
+
+.PHONY: clean
+clean:
+	-cd bnfc && $(MAKE) distclean
+	-rm {$(GRAMMAR_FILES)} 2>/dev/null
+	-rm *.hi 2>/dev/null
+	-rm *.o 2>/dev/null
+	-rm $(OUT) 2>/dev/null
+
