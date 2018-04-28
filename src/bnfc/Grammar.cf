@@ -97,9 +97,7 @@ EAdd.       Val3 ::= Val3 AddOp Val4 ;
 
 ERel.       Val2 ::= Val2 RelOp Val3 ;
 
-EAnd.       Val1 ::= Val2 "&&" Val1 ;
-
-EOr.        Val ::= Val1 "||" Val ;
+EBoolOp.     Val1 ::= Val2 BoolOp Val3 ;
 
 ECase.      Val ::= "case" Val "of" [CaseEntry] ;
 
@@ -152,6 +150,10 @@ GE.         RelOp ::= ">=" ;
 EQU.        RelOp ::= "==" ;
 
 NE.         RelOp ::= "!=" ;
+
+And.        BoolOp ::= "&&" ;
+
+Or.         BoolOp ::= "||" ;
 
 AssOp.      BinModOp ::= "=" ;
 

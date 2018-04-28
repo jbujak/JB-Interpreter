@@ -1,0 +1,19 @@
+int main() {
+	print("neg");
+	print(bool_to_string(!false));
+	print(bool_to_string(!true));
+	print("");
+
+	print("and");
+	print(bool_to_string(false && false));
+	print(bool_to_string(false && true));
+	print(bool_to_string(true  && false));
+	print(bool_to_string(true  && true));
+	print("");
+
+	print("or");
+	print(bool_to_string(false || false));
+	print(bool_to_string(false || true));
+	print(bool_to_string(true  || false));
+	print(bool_to_string(true  || true));
+}

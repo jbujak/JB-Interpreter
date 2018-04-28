@@ -8,10 +8,6 @@ int main() {
 	print(int_to_string(26 % 10));
 	print("");
 
-    print(bool_to_string(!false));
-    print(bool_to_string(!true));
-	print("");
-
 	print(bool_to_string(1 == 1));
 	print(bool_to_string(1 == 2));
 	print("");

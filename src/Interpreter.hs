@@ -134,8 +134,13 @@ interpretVal (ERel lhs op rhs) = do
         EQU -> return $ VBool(lhsInt == rhsInt)
         NE  -> return $ VBool(lhsInt /= rhsInt)
 
-interpretVal (EAnd lhs rhs) = reportError "Not yet implemented EAnd"
-interpretVal (EOr lhs rhs) = reportError "Not yet implemented EOr"
+interpretVal (EBoolOp lhs op rhs) = do
+    lhsBool <- calculateBool lhs
+    rhsBool <- calculateBool rhs
+    case op of
+        And  -> return $ VBool (lhsBool && rhsBool)
+        Or  -> return $ VBool (lhsBool || rhsBool)
+
 interpretVal (ECase val cases) = reportError "Not yet implemented ECase"
 
 -- Built-in functions handling

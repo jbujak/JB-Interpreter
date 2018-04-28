@@ -1,0 +1,15 @@
+neg
+true
+false
+
+and
+false
+false
+false
+true
+
+or
+false
+true
+true
+true
