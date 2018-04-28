@@ -11,7 +11,8 @@ import AbsGrammar
 
 -- Type definitions
 
-data SVar = VInt Integer | VBool Bool | VString String | VVoid deriving Show
+data SVar = VInt Integer | VBool Bool | VString String | VVoid | VArr [SVar]
+    deriving Show
 type Loc = Integer
 type Fun = ([SVar] -> SVar)
 
@@ -148,11 +149,7 @@ interpretStmt (ValStmt val) = interpretVal val >> return ()
 -- Interpreting values
 
 interpretVal :: Val -> Interp SVar
-interpretVal (ELval (LVar (Ident name))) = getVar name
-
-interpretVal (ELval (LArr arr index)) = reportError "Not yet implemented LArr"
-
-interpretVal (ELval (LRec record (Ident field))) = reportError "Not yet implemented LRec"
+interpretVal (ELVal lval) = calculateLVal lval
 
 interpretVal (EVar (Var label val)) = reportError "Not yet implemented EVar"
 
@@ -168,7 +165,9 @@ interpretVal (EApp (Ident funName) args) = if isBuiltIn funName
     then executeBuiltIn funName args
     else reportError "Not yet implemented EApp"
 
-interpretVal (EArr arr) = reportError "Not yet implemented EArr"
+interpretVal (EArr arr) = do
+    values <- mapM interpretVal arr
+    return $ VArr values
 
 interpretVal (ERec rec) = reportError "Not yet implemented ERec"
 
@@ -217,7 +216,7 @@ interpretVal (EBoolOp lhs op rhs) = do
 
 interpretVal (ECase val cases) = reportError "Not yet implemented ECase"
 
--- Lvalue handling
+-- LValue handling
 
 modifyLVal :: LVal -> (SVar -> Interp SVar) -> Interp ()
 modifyLVal (LVar (Ident name)) f = do
@@ -225,9 +224,31 @@ modifyLVal (LVar (Ident name)) f = do
     newVar <- f var
     setVar name (Just newVar)
 
-modifyLVal (LArr arr index) f = reportError "Not yet implemented LArr"
+modifyLVal (LArr arr index) f = do
+    (VArr arrayVal) <- calculateLVal arr
+    indexInt <- calculateInt index
+    if indexInt >= toInteger (length arrayVal)
+    then reportError $ "Array index out of bounds: " ++ show indexInt
+    else do
+        newElem <- f (arrayVal !! fromInteger indexInt)
+        modifyLVal arr (\_ -> return $ VArr (replaceElem indexInt newElem arrayVal))
 
 modifyLVal (LRec record (Ident field)) f = reportError "Not yet implemented LRec"
+
+
+calculateLVal :: LVal -> Interp SVar
+
+calculateLVal (LVar (Ident name)) = getVar name
+
+calculateLVal (LArr arr index) = do
+    (VArr arrayVal) <- calculateLVal arr
+    indexInt <- calculateInt index
+    if indexInt >= toInteger (length arrayVal)
+    then reportError $ "Array index out of bounds: " ++ show indexInt
+    else return (arrayVal !! fromInteger indexInt)
+
+calculateLVal (LRec record (Ident field)) = reportError "Not yet implemented LRec"
+
 
 -- Built-in functions handling
 
@@ -322,3 +343,7 @@ getNewLoc = do
     newloc <- gets location
     modify $ \s -> s { location = newloc + 1 }
     return newloc
+
+replaceElem :: Integer -> a -> [a] -> [a]
+replaceElem integer new list = (take n list) ++ (new:(drop (n+1) list)) where
+    n = fromInteger integer

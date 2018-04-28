@@ -69,7 +69,7 @@ UserType.   Type ::= Ident ;
 Array.      Type ::= "[" Type "]" ;
 
 -- Values --------------------------------------------------
-ELval.      Val6 ::= LVal ;
+ELVal.      Val6 ::= LVal ;
 
 EVar.       Val6 ::= Var ;
 
