@@ -100,7 +100,10 @@ interpretTopDef (VariantDef _ _) = return ()
 -- Interpreting statements
 
 interpretStmt :: Stmt -> Interp ()
-interpretStmt (BStmt (Block cmds)) = forM_ cmds interpretStmt
+interpretStmt (BStmt (Block cmds)) = do
+    env <- gets vEnv
+    forM_ cmds interpretStmt
+    modify $ \s -> s { vEnv = env }
 
 interpretStmt (FStmt funDef) = reportError "Not yet implemented FStmt"
 
@@ -125,10 +128,10 @@ interpretStmt (Ret val) = reportError "Not yet implemented Ret"
 interpretStmt VRet = reportError "Not yet implemented VRet"
 
 interpretStmt (VarDecl _ item) = case item of
-    NoInit (Ident name)     -> setVar name Nothing
+    NoInit (Ident name)     -> newVar name Nothing
     Init   (Ident name) val -> do
         res <- interpretVal val
-        setVar name (Just res)
+        newVar name (Just res)
 
 interpretStmt (BinMod lval AssOp arg) = do
     val <- interpretVal arg
@@ -246,8 +249,11 @@ interpretVal (ECase val cases) = do
         VVar label varValue -> case findCase label cases of
             Nothing -> reportError "non-exhaustive pattern in case"
             Just (CaseEntry (VarEntry (Ident caseLabel) (Ident varName)) resVal) -> do
-                setVar varName (Just varValue)
-                interpretVal resVal
+                env <- gets vEnv
+                newVar varName (Just varValue)
+                res <- interpretVal resVal
+                modify $ \s -> s { vEnv = env }
+                return res
         _ -> reportError "case argument must be variant"
 
 interpretRecEntry :: RecEntry -> Interp (String, SVar)
@@ -374,11 +380,15 @@ setVar name var = do
     store <- gets store
     case lookup name env of
         Just loc -> modify $ \s -> s { store = replaceElemKey loc var store }
-        Nothing  -> do
-                    newloc <- getNewLoc
-                    modify $ \s -> s { vEnv  = replaceElemKey name newloc env,
-                                       store = replaceElemKey newloc var store }
-        where
+        Nothing  -> newVar name var
+
+newVar :: String -> Maybe SVar -> Interp ()
+newVar name var = do
+    env    <- gets vEnv
+    store  <- gets store
+    newloc <- getNewLoc
+    modify $ \s -> s { vEnv  = replaceElemKey name newloc env,
+                       store = replaceElemKey newloc var store }
 
 getVar :: String -> Interp SVar
 getVar name = do

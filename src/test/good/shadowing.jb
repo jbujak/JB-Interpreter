@@ -1,0 +1,18 @@
+int main() {
+	int a = 1;
+	print(int_to_string(a)); // 1
+	{
+		a++;
+		print(int_to_string(a)); // 2
+		int a = 3;
+		print(int_to_string(a)); // 3
+		a++;
+		print(int_to_string(a)); // 4
+		{
+			a++;
+			print(int_to_string(a)); // 5
+		}
+		print(int_to_string(a)); // 5
+	}
+	print(int_to_string(a)); // 2
+}
