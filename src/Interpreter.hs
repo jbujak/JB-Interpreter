@@ -107,9 +107,13 @@ interpretStmt (BStmt (Block cmds)) = do
 
 interpretStmt (FStmt funDef) = reportError "Not yet implemented FStmt"
 
-interpretStmt (Cond cond ifStmt) = reportError "Not yet implemented Cond"
+interpretStmt (Cond cond ifStmt) = do
+    condBool <- calculateBool cond
+    if condBool then interpretStmt ifStmt else return ()
 
-interpretStmt (CondElse cond ifStmt elseStmt) = reportError "Not yet implemented CondElse"
+interpretStmt (CondElse cond ifStmt elseStmt) = do
+    condBool <- calculateBool cond
+    interpretStmt $ if condBool then ifStmt else elseStmt
 
 interpretStmt (While cond stmt) = reportError "Not yet implemented While"
 
