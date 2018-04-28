@@ -1,9 +1,12 @@
 #! /bin/bash
 RED='\033[0;31m'
 GREEN='\033[0;32m'
-NC='\033[0m'
+BLUE='\033[0;36m'
+BOLD='\e[1m'
+RESET='\033[0m'
 
-echo "Good programs tests"
+echo ""
+echo -e ${BLUE}${BOLD}Good programs tests${RESET}
 for file in $(ls good/*.jb)
 do
     ../interpreter $file >out 2>err
@@ -11,9 +14,9 @@ do
     expected_code=0
     if diff $file.out out 2>&1 >/dev/null && [ $code = $expected_code ]
     then
-        echo -e $file ${GREEN}OK${NC}
+        echo -e $file ${GREEN}OK${RESET}
     else
-        echo -e $file ${RED}ERROR${NC}
+        echo -e $file ${RED}ERROR${RESET}
         cat out
         cat err
     fi
@@ -21,7 +24,8 @@ do
     rm err
 done
 
-echo "Bad programs tests"
+echo ""
+echo -e ${BLUE}${BOLD}Bad programs tests${RESET}
 for file in $(ls bad/*.jb)
 do
     ../interpreter $file >out 2>err
@@ -29,11 +33,11 @@ do
     expected_code=1
     if [ $code = $expected_code ]
     then
-        echo -e $file ${GREEN}OK${NC}
+        echo -e $file ${GREEN}OK${RESET}
 	echo -n -e '\t'
         cat err
     else
-        echo -e $file ${RED}ERROR${NC}
+        echo -e $file ${RED}ERROR${RESET}
     fi
     rm out
     rm err

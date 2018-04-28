@@ -1,0 +1,10 @@
+int main() {
+	int x = 1;
+	print(int_to_string(x));
+
+	string y = "a";
+	print(y);
+
+	bool z = true;
+	print(bool_to_string(z));
+}

@@ -20,9 +20,9 @@ Block.      Block ::= "{" [Stmt] "}" ;
 
 separator   Stmt "" ;
 
-BStmt.       Stmt ::= Block ;
+BStmt.      Stmt ::= Block ;
 
-FStmt.       Stmt ::= TopDef ;
+FStmt.      Stmt ::= TopDef ;
 
 Cond.       Stmt ::= "if" "(" Val ")" Stmt  ;
 
@@ -44,7 +44,7 @@ Ret.        Stmt ::= "return" Val ";" ;
 
 VRet.       Stmt ::= "return" ";" ;
 
-Decl.       Stmt ::= Type Item ";" ;
+VarDecl.    Stmt ::= Type Item ";" ;
 
 NoInit.     Item ::= Ident ; 
 
@@ -54,7 +54,7 @@ BinMod.     Stmt ::= LVal BinModOp Val  ";" ;
 
 UnMod.      Stmt ::= LVal UnModOp ";" ;
 
-ValStmt.     Stmt ::= Val ";" ;
+ValStmt.    Stmt ::= Val ";" ;
 
 -- Types ---------------------------------------------------
 

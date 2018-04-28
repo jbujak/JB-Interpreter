@@ -9,18 +9,21 @@ import PrintGrammar
 import ErrM
 import AbsGrammar
 
+-- Type definitions
+
 data SVar = VInt Integer | VBool Bool | VString String | VVoid deriving Show
 type Loc = Integer
 type Fun = ([SVar] -> SVar)
 
-type VEnv = [(String, Loc)]
-type Store = [(Loc, String)]
+type VEnv  = [(String, Loc)]
+type Store = [(Loc, Maybe SVar)]
 
 
 data ExecState = ExecState {
     vEnv :: VEnv,
     store :: Store,
-    output :: String
+    output :: String,
+    location :: Integer
 }
 
 data Result a = Result a | Error String String
@@ -37,6 +40,9 @@ instance Applicative Result where
     (<*>) = ap
 
 type Interp a = (StateT ExecState Result) a
+
+
+-- Framework for running interpreter
 
 main :: IO ()
 main = do
@@ -65,6 +71,14 @@ parse str = case pProgram $ myLexer str of
     Ok ast -> Result ast
     Bad msg -> Error "" msg
 
+usage :: IO ()
+usage = putStrLn "usage: ./interpreter program"
+    
+runInterp :: Interp () -> Result String
+runInterp m = fmap (output . snd) $ runStateT m emptyExecState
+
+emptyExecState :: ExecState
+emptyExecState = ExecState {vEnv = [], store = [], output = "", location = 0}
 
 -- Interpreting top-level structures
 
@@ -103,7 +117,11 @@ interpretStmt (Ret val) = reportError "Not yet implemented Ret"
 
 interpretStmt VRet = reportError "Not yet implemented VRet"
 
-interpretStmt (Decl iType item) = reportError "Not yet implemented Decl"
+interpretStmt (VarDecl _ item) = case item of
+    NoInit (Ident name)     -> setVar name Nothing
+    Init   (Ident name) val -> do
+        res <- interpretVal val
+        setVar name (Just res)
 
 interpretStmt (BinMod lhs op rhs) = reportError "Not yet implemented BinMod"
 
@@ -115,16 +133,28 @@ interpretStmt (ValStmt val) = interpretVal val >> return ()
 -- Interpreting values
 
 interpretVal :: Val -> Interp SVar
-interpretVal (ELval lval) = reportError "Not yet implemented ELval"
+interpretVal (ELval (LVar (Ident name))) = getVar name
+
+interpretVal (ELval (LArr arr index)) = reportError "Not yet implemented LArr"
+
+interpretVal (ELval (LRec record (Ident field))) = reportError "Not yet implemented LRec"
+
 interpretVal (EVar (Var label val)) = reportError "Not yet implemented EVar"
+
 interpretVal (ELitInt n) = return $ VInt n
+
 interpretVal  ELitTrue = return $ VBool True
+
 interpretVal  ELitFalse = return $ VBool False
+
 interpretVal (EString str) = return $ VString str
+
 interpretVal (EApp (Ident funName) args) = if isBuiltIn funName
     then executeBuiltIn funName args
     else reportError "Not yet implemented EApp"
+
 interpretVal (EArr arr) = reportError "Not yet implemented EArr"
+
 interpretVal (ERec rec) = reportError "Not yet implemented ERec"
 
 interpretVal (Neg arg) = do
@@ -220,18 +250,43 @@ getString :: SVar -> Interp String
 getString (VString s) = return s
 getString var = reportError $ "expected string instead of " ++ (show var)
 
-
 printToOutput :: String -> Interp ()
 printToOutput str = modify $ \s -> s {output = (output s) ++ str ++ "\n"}
 
 reportError :: String -> Interp a
 reportError msg = StateT { runStateT = \s -> Error (output s) msg }
-    
-runInterp :: Interp () -> Result String
-runInterp m = fmap (output . snd) $ runStateT m emptyExecState
 
-emptyExecState :: ExecState
-emptyExecState = ExecState {vEnv = [], store = [], output = ""}
+setVar :: String -> Maybe SVar -> Interp ()
+setVar name var = do
+    env   <- gets vEnv
+    store <- gets store
+    case lookup name env of
+        Just loc -> modify $ \s -> s { store = setElem loc var store }
+        Nothing  -> do
+                    newloc <- getNewLoc
+                    modify $ \s -> s { vEnv  = setElem name newloc env,
+                                       store = setElem newloc var store }
+        where
+        setElem key val list = (key, val):(filter (\x -> fst x /= key) list)
 
-usage :: IO ()
-usage = putStrLn "usage: ./interpreter program"
+getVar :: String -> Interp SVar
+getVar name = do
+    loc   <- getVarLoc name
+    store <- gets store
+    let (Just var) = lookup loc store
+    case var of
+        Nothing  -> reportError $ "variable " ++ name ++ " is not initialized"
+        Just var -> return var
+
+getVarLoc :: String -> Interp Loc
+getVarLoc name = do
+    env <- gets vEnv
+    case lookup name env of
+        Nothing  -> reportError $ "unknown variable: " ++  name
+        Just loc -> return loc
+
+getNewLoc :: Interp Integer
+getNewLoc = do
+    newloc <- gets location
+    modify $ \s -> s { location = newloc + 1 }
+    return newloc
