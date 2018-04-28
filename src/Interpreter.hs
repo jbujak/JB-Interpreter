@@ -43,10 +43,11 @@ tryExecute s = do
     ast <- parse s
     runInterp $ interpretProgram ast
 
-    
-
 parse :: String -> Err Program
 parse str = pProgram $ myLexer str
+
+
+-- Interpreting top-level structures
 
 interpretProgram :: Program -> Interp
 interpretProgram (Program topDefs) = forM_ topDefs interpretTopDef
@@ -54,17 +55,22 @@ interpretProgram (Program topDefs) = forM_ topDefs interpretTopDef
 interpretTopDef :: TopDef -> Interp
 interpretTopDef f @ (TypeFnDef funType (Ident funName) args (Block cmds)) = if funName == "main" then
     do
-        forM_ cmds interpretCmd
+        forM_ cmds interpretStmt
     else
         --TODO add to FEnv
         return ()
 
-interpretCmd :: Cmd -> Interp
-interpretCmd (BCmd (Block cmds)) = forM_ cmds interpretCmd
-interpretCmd (ValCmd (EApp (Ident funName) (arg:[]))) = if funName == "print"
+
+-- Interpreting statements
+
+interpretStmt :: Stmt -> Interp
+interpretStmt (BStmt (Block cmds)) = forM_ cmds interpretStmt
+interpretStmt (ValStmt (EApp (Ident funName) (arg:[]))) = if funName == "print"
     then printToOutput "print"
     else return ()
 
+
+-- Helper functions
 
 printToOutput :: String -> Interp
 printToOutput str = modify $ \s -> s {output = (output s) ++ str ++ "\n"}

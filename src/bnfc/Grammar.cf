@@ -16,45 +16,45 @@ separator   Arg "," ;
 
 -- statements ----------------------------------------------
 
-Block.      Block ::= "{" [Cmd] "}" ;
+Block.      Block ::= "{" [Stmt] "}" ;
 
-separator   Cmd "" ;
+separator   Stmt "" ;
 
-BCmd.       Cmd ::= Block ;
+BStmt.       Stmt ::= Block ;
 
-FCmd.       Cmd ::= TopDef ;
+FStmt.       Stmt ::= TopDef ;
 
-Cond.       Cmd ::= "if" "(" Val ")" Cmd  ;
+Cond.       Stmt ::= "if" "(" Val ")" Stmt  ;
 
-CondElse.   Cmd ::= "if" "(" Val ")" Cmd "else" Cmd  ;
+CondElse.   Stmt ::= "if" "(" Val ")" Stmt "else" Stmt  ;
 
-While.      Cmd ::= "while" "(" Val ")" Cmd ;
+While.      Stmt ::= "while" "(" Val ")" Stmt ;
 
-WhileAs.    Cmd ::= "while" "(" Val ")" "as" Ident Cmd ;
+WhileAs.    Stmt ::= "while" "(" Val ")" "as" Ident Stmt ;
 
-Break.      Cmd ::= "break;" ;
+Break.      Stmt ::= "break;" ;
 
-BreakL.     Cmd ::= "break" Ident ";" ;
+BreakL.     Stmt ::= "break" Ident ";" ;
 
-Continue.   Cmd ::= "continue;" ;
+Continue.   Stmt ::= "continue;" ;
 
-ContinueL.  Cmd ::= "continue" Ident ";" ;
+ContinueL.  Stmt ::= "continue" Ident ";" ;
 
-Ret.        Cmd ::= "return" Val ";" ;
+Ret.        Stmt ::= "return" Val ";" ;
 
-VRet.       Cmd ::= "return" ";" ;
+VRet.       Stmt ::= "return" ";" ;
 
-Decl.       Cmd ::= Type Item ";" ;
+Decl.       Stmt ::= Type Item ";" ;
 
 NoInit.     Item ::= Ident ; 
 
 Init.       Item ::= Ident "=" Val ;
 
-BinMod.     Cmd ::= LVal BinModOp Val  ";" ;
+BinMod.     Stmt ::= LVal BinModOp Val  ";" ;
 
-UnMod.      Cmd ::= LVal UnModOp ";" ;
+UnMod.      Stmt ::= LVal UnModOp ";" ;
 
-ValCmd.     Cmd ::= Val ";" ;
+ValStmt.     Stmt ::= Val ";" ;
 
 -- Types ---------------------------------------------------
 
