@@ -23,7 +23,20 @@ data ExecState = ExecState {
     output :: String
 }
 
-type Interp a = (StateT ExecState Err) a
+data Result a = Result a | Error String String
+
+instance Monad Result where
+    return x = Result x
+    m >>= f = case m of
+        Result res -> f res
+        Error res err -> Error res err
+instance Functor Result where
+    fmap = liftM
+instance Applicative Result where
+    pure = return
+    (<*>) = ap
+
+type Interp a = (StateT ExecState Result) a
 
 main :: IO ()
 main = do
@@ -36,18 +49,21 @@ main = do
 
 execute :: String -> IO ()
 execute code = case tryExecute code of
-    Ok s  -> putStr s
-    Bad s -> do
-        putStrLn $ "Execution error: " ++ s
+    Result s  -> putStr s
+    Error partResult errorMSg -> do
+        putStr partResult
+        hPutStrLn stderr $ "Execution error: " ++ errorMSg
         exitWith $ ExitFailure 1
 
-tryExecute :: String -> Err String
+tryExecute :: String -> Result String
 tryExecute s = do
     ast <- parse s
     runInterp $ interpretProgram ast
 
-parse :: String -> Err Program
-parse str = pProgram $ myLexer str
+parse :: String -> Result Program
+parse str = case pProgram $ myLexer str of
+    Ok ast -> Result ast
+    Bad msg -> Error "" msg
 
 
 -- Interpreting top-level structures
@@ -102,21 +118,21 @@ executeBuiltIn "print" args = case args of
         printToOutput str
         return VVoid
     _ -> reportError "print() call should have exactly one argument\
-                \passed by value"
+                \ passed by value"
 
 executeBuiltIn "int_to_string" args = case args of
     (ArgVal arg:[]) -> do
         n <- interpretVal arg >>= getInt
         return $ VString (show n)
     _ -> reportError "int_to_string() call should have exactly one argument\
-                \passed by value"
+                \ passed by value"
 
 executeBuiltIn "bool_to_string" args = case args of
     (ArgVal arg:[]) -> do
         bool <- interpretVal arg >>= getBool
         if bool then return $ VString "true" else return $ VString "false"
     _ -> reportError "bool_to_string() call should have exactly one argument\
-                \passed by value"
+                \ passed by value"
 
 
 -- Helper functions
@@ -137,9 +153,9 @@ printToOutput :: String -> Interp ()
 printToOutput str = modify $ \s -> s {output = (output s) ++ str ++ "\n"}
 
 reportError :: String -> Interp a
-reportError msg = StateT { runStateT = \s -> Bad msg }
+reportError msg = StateT { runStateT = \s -> Error (output s) msg }
     
-runInterp :: Interp () -> Err String
+runInterp :: Interp () -> Result String
 runInterp m = fmap (output . snd) $ runStateT m emptyExecState
 
 emptyExecState :: ExecState
