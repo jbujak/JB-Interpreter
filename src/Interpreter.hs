@@ -11,8 +11,9 @@ import AbsGrammar
 
 -- Type definitions
 
-data SVar = VInt Integer | VBool Bool | VString String | VVoid | VArr [SVar]
-    deriving Show
+data SVar = VInt Integer | VBool Bool | VString String | VVoid | VArr [SVar] |
+        VRec [(String, SVar)] deriving Show
+
 type Loc = Integer
 type Fun = ([SVar] -> SVar)
 
@@ -88,7 +89,10 @@ interpretProgram (Program topDefs) = forM_ topDefs interpretTopDef
 
 interpretTopDef :: TopDef -> Interp ()
 interpretTopDef (TypeFnDef funType (Ident "main") args (Block cmds)) = forM_ cmds interpretStmt
+
 interpretTopDef (TypeFnDef funType (Ident funName) args (Block cmds)) = return () --TODO
+
+interpretTopDef (RecordDef _ _) = return ()
 
 
 -- Interpreting statements
@@ -169,7 +173,9 @@ interpretVal (EArr arr) = do
     values <- mapM interpretVal arr
     return $ VArr values
 
-interpretVal (ERec rec) = reportError "Not yet implemented ERec"
+interpretVal (ERec entries) = do
+    values <- mapM interpretRecEntry entries
+    return $ VRec values
 
 interpretVal (Neg arg) = do
     argInt <- calculateInt arg
@@ -216,6 +222,11 @@ interpretVal (EBoolOp lhs op rhs) = do
 
 interpretVal (ECase val cases) = reportError "Not yet implemented ECase"
 
+interpretRecEntry :: RecEntry -> Interp (String, SVar)
+interpretRecEntry (RecEntry (Ident label) val) = do
+    var <- interpretVal val
+    return (label, var)
+
 -- LValue handling
 
 modifyLVal :: LVal -> (SVar -> Interp SVar) -> Interp ()
@@ -231,10 +242,15 @@ modifyLVal (LArr arr index) f = do
     then reportError $ "Array index out of bounds: " ++ show indexInt
     else do
         newElem <- f (arrayVal !! fromInteger indexInt)
-        modifyLVal arr (\_ -> return $ VArr (replaceElem indexInt newElem arrayVal))
+        modifyLVal arr (\_ -> return $ VArr (replaceElemIndex indexInt newElem arrayVal))
 
-modifyLVal (LRec record (Ident field)) f = reportError "Not yet implemented LRec"
-
+modifyLVal (LRec record (Ident field)) f = do
+    (VRec recVal) <- calculateLVal record
+    case lookup field recVal of
+        Nothing  -> reportError $ "record does not have field " ++ field
+        Just var -> do
+            newVar <- f var
+            modifyLVal record (\_ -> return $ VRec (replaceElemKey field newVar recVal))
 
 calculateLVal :: LVal -> Interp SVar
 
@@ -247,7 +263,11 @@ calculateLVal (LArr arr index) = do
     then reportError $ "Array index out of bounds: " ++ show indexInt
     else return (arrayVal !! fromInteger indexInt)
 
-calculateLVal (LRec record (Ident field)) = reportError "Not yet implemented LRec"
+calculateLVal (LRec record (Ident field)) = do
+    (VRec recVal) <- calculateLVal record
+    case lookup field recVal of
+        Nothing  -> reportError $ "record does not have field " ++ field
+        Just var -> return var
 
 
 -- Built-in functions handling
@@ -314,13 +334,12 @@ setVar name var = do
     env   <- gets vEnv
     store <- gets store
     case lookup name env of
-        Just loc -> modify $ \s -> s { store = setElem loc var store }
+        Just loc -> modify $ \s -> s { store = replaceElemKey loc var store }
         Nothing  -> do
                     newloc <- getNewLoc
-                    modify $ \s -> s { vEnv  = setElem name newloc env,
-                                       store = setElem newloc var store }
+                    modify $ \s -> s { vEnv  = replaceElemKey name newloc env,
+                                       store = replaceElemKey newloc var store }
         where
-        setElem key val list = (key, val):(filter (\x -> fst x /= key) list)
 
 getVar :: String -> Interp SVar
 getVar name = do
@@ -344,6 +363,9 @@ getNewLoc = do
     modify $ \s -> s { location = newloc + 1 }
     return newloc
 
-replaceElem :: Integer -> a -> [a] -> [a]
-replaceElem integer new list = (take n list) ++ (new:(drop (n+1) list)) where
+replaceElemIndex :: Integer -> a -> [a] -> [a]
+replaceElemIndex integer new list = (take n list) ++ (new:(drop (n+1) list)) where
     n = fromInteger integer
+
+replaceElemKey :: Eq a => a -> b -> [(a, b)] -> [(a, b)]
+replaceElemKey key val list = (key, val):(filter (\x -> fst x /= key) list)

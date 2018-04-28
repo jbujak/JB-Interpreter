@@ -1,0 +1,17 @@
+record {
+	int num;
+} my_record;
+
+int main() {
+	my_record rec = <
+		num = 1;
+	>;
+	print(int_to_string(rec->num));
+	rec->num++;
+	print(int_to_string(rec->num));
+	rec->num = 10;
+	int x = rec->num;
+	print(int_to_string(rec->num));
+	rec->num += x;
+	print(int_to_string(rec->num));
+}

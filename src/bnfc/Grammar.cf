@@ -8,6 +8,12 @@ TypeFnDef.  TopDef ::= Type Ident "(" [Arg] ")" Block ;
 
 VoidFnDef.  TopDef ::= "void" Ident "(" [Arg] ")" Block ;
 
+RecordDef.  TopDef ::= "record" "{" [TypeEntry] "}" Ident ";";
+
+TypeEntry.  TypeEntry ::= Type Ident ;
+
+terminator nonempty TypeEntry ";" ;
+
 separator nonempty TopDef "" ;
 
 Arg. 	    Arg ::= Type Ident;
@@ -107,7 +113,7 @@ ArgVal.     Arg ::= Val ;
 
 ArgRef.     Arg ::= "&" Val ;
 
-RecEntry.   RecEntry ::= "." Ident "=" Val ;
+RecEntry.   RecEntry ::= Ident "=" Val ;
 
 CaseEntry.  CaseEntry ::= "|" Var "->" Val ;
 
