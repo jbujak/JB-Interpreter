@@ -86,25 +86,31 @@ interpretStmt (ValStmt val) = interpretVal val >> return ()
 -- Interpreting values
 
 interpretVal :: Val -> Interp SVar
-interpretVal (ELval lval) = reportError "Not yet implemented"
-interpretVal (EVar (Var label val)) = reportError "Not yet implemented"
+interpretVal (ELval lval) = reportError "Not yet implemented ELval"
+interpretVal (EVar (Var label val)) = reportError "Not yet implemented EVar"
 interpretVal (ELitInt n) = return $ VInt n
 interpretVal  ELitTrue = return $ VBool True
 interpretVal  ELitFalse = return $ VBool False
 interpretVal (EString str) = return $ VString str
 interpretVal (EApp (Ident funName) args) = if isBuiltIn funName
     then executeBuiltIn funName args
-    else reportError "Not yet implemented"
-interpretVal (EArr arr) = reportError "Not yet implemented"
-interpretVal (ERec rec) = reportError "Not yet implemented"
-interpretVal (Neg arg) = reportError "Not yet implemented"
-interpretVal (Not arg) = reportError "Not yet implemented"
-interpretVal (EMul lhs op rhs) = reportError "Not yet implemented"
-interpretVal (EAdd lhs op rhs) = reportError "Not yet implemented"
-interpretVal (ERel lhs op rhs) = reportError "Not yet implemented"
-interpretVal (EAnd lhs rhs) = reportError "Not yet implemented"
-interpretVal (EOr lhs rhs) = reportError "Not yet implemented"
-interpretVal (ECase val cases) = reportError "Not yet implemented"
+    else reportError "Not yet implemented EApp"
+interpretVal (EArr arr) = reportError "Not yet implemented EArr"
+interpretVal (ERec rec) = reportError "Not yet implemented ERec"
+interpretVal (Neg arg) = do
+    argVal <- interpretVal arg
+    argInt <- getInt argVal
+    return $ VInt (-1 * argInt)
+interpretVal (Not arg) = do
+    argVal <- interpretVal arg
+    argBool <- getBool argVal
+    return $ VBool (not argBool)
+interpretVal (EMul lhs op rhs) = reportError "Not yet implemented EMul"
+interpretVal (EAdd lhs op rhs) = reportError "Not yet implemented EAdd"
+interpretVal (ERel lhs op rhs) = reportError "Not yet implemented ERel"
+interpretVal (EAnd lhs rhs) = reportError "Not yet implemented EAnd"
+interpretVal (EOr lhs rhs) = reportError "Not yet implemented EOr"
+interpretVal (ECase val cases) = reportError "Not yet implemented ECase"
 
 -- Built-in functions handling
 
