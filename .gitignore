@@ -1,0 +1,10 @@
+*.o
+*.hi
+*.hs
+*.x
+*.y
+src/bnfc/DocGrammar.txt
+src/bnfc/Makefile
+src/bnfc/TestGrammar
+interpreter
+example.jb
