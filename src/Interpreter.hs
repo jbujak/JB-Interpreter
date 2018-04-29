@@ -174,9 +174,10 @@ addRefArgs a b = executionError $ (show a) ++ " " ++ (show b)
 
 interpretStmt :: Stmt -> Interp ()
 interpretStmt (BStmt (Block stmts)) = do
-    env <- gets vEnv
+    vEnv <- gets vEnv
+    fEnv <- gets fEnv
     executeStmts stmts
-    modify $ \s -> s { vEnv = env }
+    modify $ \s -> s { vEnv = vEnv, fEnv = fEnv }
 
 interpretStmt (FStmt funDef) = addFun funDef
 
