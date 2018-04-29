@@ -1,0 +1,7 @@
+void f() {
+	continue;
+}
+
+int main() {
+	f();
+}

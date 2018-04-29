@@ -96,7 +96,12 @@ interpretProgram :: Program -> Interp ()
 interpretProgram (Program topDefs) = forM_ topDefs interpretTopDef
 
 interpretTopDef :: TopDef -> Interp ()
-interpretTopDef (TypeFnDef funType (Ident "main") args (Block cmds)) = forM_ cmds interpretStmt
+interpretTopDef (TypeFnDef funType (Ident "main") args block) = do
+    interpretStmt (BStmt block)
+    breakContinue <- gets breakContinue
+    case breakContinue of
+        BCNone -> return ()
+        _    -> reportError "End of function reached during break/continue"
 
 interpretTopDef (TypeFnDef funType (Ident funName) args (Block cmds)) = return () --TODO
 

@@ -1,0 +1,7 @@
+void f() {
+	break;
+}
+
+int main() {
+	f();
+}
