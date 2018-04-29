@@ -15,6 +15,7 @@ data SVar = VInt Integer | VBool Bool | VString String | VVoid | VArr [SVar] |
         VRec [(String, SVar)] | VVar String SVar deriving Show
 
 data BreakContinue = BCNone | BNearest | CNearest | BLabel String | CLabel String
+data Return = RNone | RReturn SVar
 
 type FEnv = [(String, Fun)]
 data Fun = Fun {
@@ -35,7 +36,8 @@ data ExecState = ExecState {
     store :: Store,
     output :: String,
     location :: Integer,
-    breakContinue :: BreakContinue
+    breakContinue :: BreakContinue,
+    returnState :: Return
 }
 
 data Result a = Result a | Error String String
@@ -95,7 +97,8 @@ emptyExecState = ExecState {
     store = [],
     output = "",
     location = 0,
-    breakContinue = BCNone
+    breakContinue = BCNone,
+    returnState = RNone
 }
 
 -- Interpreting top-level structures
@@ -145,8 +148,9 @@ execFun f valArgs refArgs = do
     addValArgs (fValArgs f) valArgs
     addRefArgs (fRefArgs f) refArgs
     interpretStmt $ fStmt f
-    modify $ \s -> s { vEnv = vEnv }
-    return VVoid
+    ret <- gets returnState
+    modify $ \s -> s { vEnv = vEnv, returnState = RNone }
+    return $ case ret of RNone -> VVoid; RReturn retVal -> retVal
 
 addValArgs :: [String] -> [SVar] -> Interp ()
 addValArgs [] [] = return ()
@@ -209,9 +213,11 @@ interpretStmt  Continue = modify $ \s -> s { breakContinue = CNearest }
 
 interpretStmt (ContinueL (Ident label)) = modify $ \s -> s { breakContinue = CLabel label }
 
-interpretStmt (Ret val) = reportError "Not yet implemented Ret"
+interpretStmt (Ret val) = do
+    ret <- interpretVal val
+    modify $ \s -> s { returnState = RReturn ret }
 
-interpretStmt VRet = reportError "Not yet implemented VRet"
+interpretStmt VRet = modify $ \s -> s { returnState = RReturn VVoid }
 
 interpretStmt (VarDecl _ item) = case item of
     NoInit (Ident name)     -> newVar name Nothing
@@ -250,9 +256,10 @@ interpretStmt (ValStmt val) = interpretVal val >> return ()
 executeStmts :: [Stmt] -> Interp ()
 executeStmts stmts = foldr (\m -> \f -> do
         breakContinue <- gets breakContinue
-        case breakContinue of
-            BCNone -> m >> f
-            _ -> return ()
+        returnState   <- gets returnState
+        case (breakContinue, returnState) of
+            (BCNone, RNone) -> m >> f
+            _               -> return ()
         ) (return ()) (map interpretStmt stmts)
 
 -- Interpreting values

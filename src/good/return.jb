@@ -1,0 +1,27 @@
+int f() {
+	return 1;
+	print("unreachable");
+}
+
+string g() {
+	return "asdf";
+	print("unreachable");
+}
+
+bool h() {
+	return true;
+	print("unreachable");
+}
+
+void x() {
+	print("begin x");
+	return;
+	print("unreachable");
+}
+
+int main() {
+	print(int_to_string(f()));
+	print(g());
+	print(bool_to_string(h()));
+	x();
+}
