@@ -40,13 +40,14 @@ data ExecState = ExecState {
     returnState :: Return
 }
 
-data Result a = Result a | Error String String
+data ErrorType = SyntaxError | TypeError | ExecutionError
+data Result a = Result a | Error ErrorType String String
 
 instance Monad Result where
     return x = Result x
     m >>= f = case m of
         Result res -> f res
-        Error res err -> Error res err
+        Error t res err -> Error t res err
 instance Functor Result where
     fmap = liftM
 instance Applicative Result where
@@ -69,9 +70,12 @@ main = do
 execute :: String -> IO ()
 execute code = case tryExecute code of
     Result s  -> putStr s
-    Error partResult errorMSg -> do
+    Error errorType partResult errorMSg -> do
         putStr partResult
-        hPutStrLn stderr $ "Execution error: " ++ errorMSg
+        case errorType of
+            SyntaxError    -> hPutStrLn stderr $ "Syntax error: "    ++ errorMSg
+            TypeError      -> hPutStrLn stderr $ "Type error: "      ++ errorMSg
+            ExecutionError -> hPutStrLn stderr $ "Execution error: " ++ errorMSg
         exitWith $ ExitFailure 255
 
 tryExecute :: String -> Result String
@@ -82,7 +86,7 @@ tryExecute s = do
 parse :: String -> Result Program
 parse str = case pProgram $ myLexer str of
     Ok ast -> Result ast
-    Bad msg -> Error "" msg
+    Bad msg -> Error SyntaxError "" msg
 
 usage :: IO ()
 usage = putStrLn "usage: ./interpreter program"
@@ -112,7 +116,7 @@ interpretTopDef (FnDef funType (Ident "main") args block) = do
     breakContinue <- gets breakContinue
     case breakContinue of
         BCNone -> return ()
-        _    -> reportError "end of function reached during break/continue"
+        _    -> executionError "end of function reached during break/continue"
 
 interpretTopDef funDef @ (FnDef _ _ _ _) = addFun funDef
 
@@ -126,7 +130,7 @@ addFun (FnDef _ (Ident funName) args block) = do
     fEnv <- gets fEnv
     vEnv <- gets vEnv
     case lookup funName fEnv of
-        Just _  -> reportError $ "multiple function definitions: " ++ funName
+        Just _  -> executionError $ "multiple function definitions: " ++ funName
         Nothing -> modify $ \s -> s { fEnv = newFEnv }
             where newFEnv = replaceElemKey funName (Fun {
                     fValArgs = parseArgs valArgs,
@@ -157,14 +161,14 @@ addValArgs [] [] = return ()
 addValArgs (name:names) (var:vars) = do
     newVar name (Just var)
     addValArgs names vars
-addValArgs a b = reportError $ (show a) ++ " " ++ (show b)
+addValArgs a b = executionError $ (show a) ++ " " ++ (show b)
 
 addRefArgs :: [String] -> [Loc] -> Interp ()
 addRefArgs [] [] = return ()
 addRefArgs (name:names) (loc:locs) = do
     setVarLoc name loc
     addRefArgs names locs
-addRefArgs a b = reportError $ (show a) ++ " " ++ (show b)
+addRefArgs a b = executionError $ (show a) ++ " " ++ (show b)
 
 -- Interpreting statements
 
@@ -234,11 +238,11 @@ interpretStmt (BinMod lval PlusEq rval) = do
     case val of 
         VInt valInt       -> modifyLVal lval $ modifyInt (+valInt)
         VString valString -> modifyLVal lval $ modifyString (++valString) 
-        _                 -> reportError "oprator += can be used with int or string"
+        _                 -> executionError "oprator += can be used with int or string"
 
 interpretStmt (BinMod lval op val) = do
     valInt <- calculateInt val
-    if op == DivEq && valInt == 0 then reportError "Cannot divide by zero"
+    if op == DivEq && valInt == 0 then executionError "Cannot divide by zero"
     else modifyLVal lval $ modifyInt (funMod valInt) where
         funMod valInt = case op of
             MinusEq -> \n -> n - valInt
@@ -284,7 +288,7 @@ interpretVal (EApp (Ident funName) args) = if isBuiltIn funName
     else do
         fEnv <- gets fEnv
         case lookup funName fEnv of
-            Nothing -> reportError $ "unknown function: " ++ funName
+            Nothing -> executionError $ "unknown function: " ++ funName
             Just f  -> do
                 valArgs <- forM (map (\(ArgVal val) -> val) valArgsRaw) interpretVal
                 refArgs <- forM (map (\(ArgRef (Ident varName)) -> varName) refArgsRaw)
@@ -316,9 +320,9 @@ interpretVal (EMul lhs op rhs) = do
     rhsInt <- calculateInt rhs
     case op of
         Times -> return $ VInt (lhsInt * rhsInt)
-        Mod   -> if rhsInt == 0 then reportError "Cannot divide by zero"
+        Mod   -> if rhsInt == 0 then executionError "Cannot divide by zero"
                                 else return $ VInt (lhsInt `mod` rhsInt)
-        Div   -> if rhsInt == 0 then reportError "Cannot divide by zero"
+        Div   -> if rhsInt == 0 then executionError "Cannot divide by zero"
                                 else return $ VInt (lhsInt `div` rhsInt)
 
 interpretVal (EAdd lhs Plus rhs) = do
@@ -331,7 +335,7 @@ interpretVal (EAdd lhs Plus rhs) = do
         VString lhsString -> do
             rhsString <- getString rhsVal
             return $ VString(lhsString ++ rhsString)
-        _ -> reportError "oprator + can be used with int or string"
+        _ -> executionError "oprator + can be used with int or string"
 
 interpretVal (EAdd lhs Minus rhs) = do
     lhsInt <- calculateInt lhs
@@ -360,14 +364,14 @@ interpretVal (ECase val cases) = do
     var <- interpretVal val
     case var of
         VVar label varValue -> case findCase label cases of
-            Nothing -> reportError "non-exhaustive pattern in case"
+            Nothing -> executionError "non-exhaustive pattern in case"
             Just (CaseEntry (VarEntry (Ident caseLabel) (Ident varName)) resVal) -> do
                 env <- gets vEnv
                 newVar varName (Just varValue)
                 res <- interpretVal resVal
                 modify $ \s -> s { vEnv = env }
                 return res
-        _ -> reportError "case argument must be variant"
+        _ -> executionError "case argument must be variant"
 
 interpretRecEntry :: RecEntry -> Interp (String, SVar)
 interpretRecEntry (RecEntry (Ident label) val) = do
@@ -392,7 +396,7 @@ modifyLVal (LArr arr index) f = do
     (VArr arrayVal) <- calculateLVal arr
     indexInt <- calculateInt index
     if indexInt >= toInteger (length arrayVal)
-    then reportError $ "Array index out of bounds: " ++ show indexInt
+    then executionError $ "Array index out of bounds: " ++ show indexInt
     else do
         newElem <- f (arrayVal !! fromInteger indexInt)
         modifyLVal arr (\_ -> return $ VArr (replaceElemIndex indexInt newElem arrayVal))
@@ -400,7 +404,7 @@ modifyLVal (LArr arr index) f = do
 modifyLVal (LRec record (Ident field)) f = do
     (VRec recVal) <- calculateLVal record
     case lookup field recVal of
-        Nothing  -> reportError $ "record does not have field " ++ field
+        Nothing  -> executionError $ "record does not have field " ++ field
         Just var -> do
             newVar <- f var
             modifyLVal record (\_ -> return $ VRec (replaceElemKey field newVar recVal))
@@ -413,13 +417,13 @@ calculateLVal (LArr arr index) = do
     (VArr arrayVal) <- calculateLVal arr
     indexInt <- calculateInt index
     if indexInt >= toInteger (length arrayVal)
-    then reportError $ "Array index out of bounds: " ++ show indexInt
+    then executionError $ "Array index out of bounds: " ++ show indexInt
     else return (arrayVal !! fromInteger indexInt)
 
 calculateLVal (LRec record (Ident field)) = do
     (VRec recVal) <- calculateLVal record
     case lookup field recVal of
-        Nothing  -> reportError $ "record does not have field " ++ field
+        Nothing  -> executionError $ "record does not have field " ++ field
         Just var -> return var
 
 
@@ -434,21 +438,21 @@ executeBuiltIn "print" args = case args of
         str <- interpretVal arg >>= getString
         printToOutput str
         return VVoid
-    _ -> reportError "print() call should have exactly one argument\
+    _ -> executionError "print() call should have exactly one argument\
                 \ passed by value"
 
 executeBuiltIn "int_to_string" args = case args of
     (ArgVal arg:[]) -> do
         n <- interpretVal arg >>= getInt
         return $ VString (show n)
-    _ -> reportError "int_to_string() call should have exactly one argument\
+    _ -> executionError "int_to_string() call should have exactly one argument\
                 \ passed by value"
 
 executeBuiltIn "bool_to_string" args = case args of
     (ArgVal arg:[]) -> do
         bool <- interpretVal arg >>= getBool
         if bool then return $ VString "true" else return $ VString "false"
-    _ -> reportError "bool_to_string() call should have exactly one argument\
+    _ -> executionError "bool_to_string() call should have exactly one argument\
                 \ passed by value"
 
 
@@ -461,7 +465,7 @@ calculateBool val = interpretVal val >>= getBool
 
 getInt :: SVar -> Interp Integer
 getInt (VInt n) = return n
-getInt var = reportError $ "expected int instead of " ++ (show var)
+getInt var = executionError $ "expected int instead of " ++ (show var)
 
 modifyInt :: (Integer -> Integer) -> SVar -> Interp SVar
 modifyInt f var = do
@@ -475,17 +479,17 @@ modifyString f var = do
 
 getBool :: SVar -> Interp Bool
 getBool (VBool b) = return b
-getBool var = reportError $ "expected bool instead of " ++ (show var)
+getBool var = executionError $ "expected bool instead of " ++ (show var)
 
 getString :: SVar -> Interp String
 getString (VString s) = return s
-getString var = reportError $ "expected string instead of " ++ (show var)
+getString var = executionError $ "expected string instead of " ++ (show var)
 
 printToOutput :: String -> Interp ()
 printToOutput str = modify $ \s -> s {output = (output s) ++ str ++ "\n"}
 
-reportError :: String -> Interp a
-reportError msg = StateT { runStateT = \s -> Error (output s) msg }
+executionError :: String -> Interp a
+executionError msg = StateT { runStateT = \s -> Error ExecutionError (output s) msg }
 
 setVar :: String -> Maybe SVar -> Interp ()
 setVar name var = do
@@ -509,14 +513,14 @@ getVar name = do
     store <- gets store
     let (Just var) = lookup loc store
     case var of
-        Nothing  -> reportError $ "variable " ++ name ++ " is not initialized"
+        Nothing  -> executionError $ "variable " ++ name ++ " is not initialized"
         Just var -> return var
 
 getVarLoc :: String -> Interp Loc
 getVarLoc name = do
     env <- gets vEnv
     case lookup name env of
-        Nothing  -> reportError $ "unknown variable: " ++  name
+        Nothing  -> executionError $ "unknown variable: " ++  name
         Just loc -> return loc
 
 setVarLoc :: String -> Loc -> Interp ()
