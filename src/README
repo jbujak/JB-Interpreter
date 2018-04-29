@@ -6,7 +6,7 @@ Building:
 Running tests:
 	`make test`
 Executing interpreter with custom program:
-	`./interpreter program.jb`
+	`./interpreter good/example.jb`
 
 Tests included are divided into two parts -- good and bad -- according to task.
 * Good programs are tested by checking both exit code and stdout.
