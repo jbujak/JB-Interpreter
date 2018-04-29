@@ -3,6 +3,7 @@ import System.Exit
 import System.Environment
 
 import Control.Monad.State
+import Control.Applicative
 
 import ParGrammar
 import PrintGrammar
