@@ -1,0 +1,11 @@
+record {
+	int a;
+} x;
+
+record {
+	int a;
+} x;
+
+int main() {
+
+}

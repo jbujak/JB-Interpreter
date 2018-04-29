@@ -545,8 +545,8 @@ replaceElemKey key val list = (key, val):(filter (\x -> fst x /= key) list)
 -- Type checking
 
 data TCType = TCInt | TCBool | TCString | TCVoid | TCArr TCType |
-        TCRec [(String, TCType)] | TCVar [(String, TCType)] | TCTypeName String
-        deriving (Show, Eq)
+        TCRec [(String, TCType)] | TCVar [(String, TCType)] | TCTypeName String|
+        TCAny deriving (Show, Eq)
 
 data TCState = TCState {
     tcVEnv :: [(String, TCType)],
@@ -566,15 +566,39 @@ runCheck m = fmap (\_ -> ()) $ runStateT m emptyTCState
 emptyTCState :: TCState
 emptyTCState = TCState {
     tcVEnv = [],
-    tcFEnv = [],
+    tcFEnv = getBuiltIns,
     tcTypes = []
 }
+
+getBuiltIns :: [(String, TCFun)]
+getBuiltIns = [("print",          TCFun TCVoid   [TCArgVal TCString "str"]),
+               ("int_to_string",  TCFun TCString [TCArgVal TCInt    "int"]),
+               ("bool_to_string", TCFun TCString [TCArgVal TCBool   "bool"])]
 
 checkProgram :: Program -> TypeCheck ()
 checkProgram (Program topDefs) = forM_ topDefs checkTopDef
 
 checkTopDef :: TopDef -> TypeCheck ()
 checkTopDef funDef @ (FnDef _ _ _ _) = tcAddFunDef funDef
+
+checkTopDef (RecordDef entries (Ident recName)) = do
+    types <- gets tcTypes
+    case lookup recName types of
+        Just _  -> typeError $ "redeclaration of type " ++ recName
+        Nothing -> modify $ \s ->
+            s { tcTypes = replaceElemKey recName (TCRec $ parseEntries entries) types }
+
+checkTopDef (VariantDef entries (Ident recName)) = do
+    types <- gets tcTypes
+    case lookup recName types of
+        Just _  -> typeError $ "redeclaration of type " ++ recName
+        Nothing -> modify $ \s ->
+            s { tcTypes = replaceElemKey recName (TCVar $ parseEntries entries) types }
+
+parseEntries :: [TypeEntry] -> [(String, TCType)]
+parseEntries [] = []
+parseEntries ((TypeEntry t (Ident name)):entries) =
+    (name, tcParseType t):(parseEntries entries)
 
 -- Type checking in statements
 
@@ -587,13 +611,22 @@ checkStmt (BStmt (Block stmts)) = do
 
 checkStmt (FStmt funDef) = tcAddFunDef funDef
 
-checkStmt (Cond cond ifStmt) = typeError "Not yet implemented"
+checkStmt (Cond cond ifStmt) = do
+    checkValBool cond
+    checkStmt ifStmt
 
-checkStmt (CondElse cond ifStmt elseStmt) = typeError "Not yet implemented"
+checkStmt (CondElse cond ifStmt elseStmt) = do
+    checkValBool cond
+    checkStmt ifStmt
+    checkStmt elseStmt
 
-checkStmt (While cond stmt) = typeError "Not yet implemented"
+checkStmt (While cond stmt) = do
+    checkValBool cond
+    checkStmt stmt
 
-checkStmt (WhileAs cond _ stmt) = typeError "Not yet implemented"
+checkStmt (WhileAs cond _ stmt) = do
+    checkValBool cond
+    checkStmt stmt
 
 checkStmt  Break = return ()
 
@@ -603,36 +636,86 @@ checkStmt  Continue = return ()
 
 checkStmt (ContinueL _) = return ()
 
-checkStmt (Ret val) = typeError "Not yet implemented"
+checkStmt (Ret val) = do
+    valType <- checkVal val --TODO check return value type
+    return ()
 
-checkStmt VRet = typeError "Not yet implemented"
+checkStmt VRet = return () --TODO check return value type
 
-checkStmt (VarDecl _ item) = typeError "Not yet implemented"
+checkStmt (VarDecl varType (NoInit (Ident varName))) = do
+    vEnv <- gets tcVEnv
+    modify $ \s -> s { tcVEnv = replaceElemKey varName (tcParseType varType) vEnv }
 
-checkStmt (BinMod lval AssOp arg) = typeError "Not yet implemented"
+checkStmt (VarDecl varType (Init (Ident varName) val)) = do
+    vEnv <- gets tcVEnv
+    valType <- checkVal val
+    mergeTypes (tcParseType varType) valType
+    modify $ \s -> s { tcVEnv = replaceElemKey varName (tcParseType varType) vEnv }
 
-checkStmt (BinMod lval PlusEq rval) = typeError "Not yet implemented"
+checkStmt (BinMod lval AssOp arg) = do
+    lvalType <- checkVal (ELVal lval)
+    argType <- checkVal arg
+    mergeTypes lvalType argType
+    return ()
 
-checkStmt (BinMod lval op val) = typeError "Not yet implemented"
+checkStmt (BinMod lval PlusEq rval) = do
+    lvalType <- checkVal (ELVal lval)
+    case lvalType of
+        TCInt -> checkValInt rval >> return ()
+        TCString -> checkValString rval >> return ()
+        _ -> typeError "operator += can be used with string or int"
 
-checkStmt (UnMod lval op) = typeError "Not yet implemented"
+checkStmt (BinMod lval _ val) = do
+    checkValInt (ELVal lval)
+    checkValInt val
+    return ()
+
+checkStmt (UnMod lval _) = checkValInt (ELVal lval) >> return ()
 
 checkStmt (ValStmt val) = checkVal val >> return ()
 
 tcAddFunDef :: TopDef -> TypeCheck ()
 tcAddFunDef (FnDef retType (Ident funName) args stmt) = do
     modify $ \s -> s {
-        tcFEnv = (funName, TCFun (tcParseType retType) (tcParseArgs args)):(tcFEnv s)
+        tcFEnv = (funName, TCFun (tcParseType retType) (tcParseArgs args)):(tcFEnv s),
+        tcVEnv = addArgs args (tcVEnv s)
     }
     checkStmt $ BStmt stmt
+    where
+        addArgs [] vEnv = vEnv
+        addArgs ((ArgValDef argType (Ident argName)):args) vEnv =
+            addArgs args $ replaceElemKey argName (tcParseType argType) vEnv
+        addArgs ((ArgRefDef argType (Ident argName)):args) vEnv =
+            addArgs args $ replaceElemKey argName (tcParseType argType) vEnv
 
 
 -- Type cheking in values
 
 checkVal :: Val -> TypeCheck TCType
-checkVal (ELVal lval) = typeError "Not yet implmemented"
+checkVal (ELVal lval) = case lval of
+    LVar (Ident varName) -> do
+        vEnv <- gets tcVEnv
+        case lookup varName vEnv of
+            Nothing -> typeError $ "unknown variable " ++ varName
+            Just varType -> getPreciseType varType
+    LArr arr index -> do
+        checkValInt index
+        arrType <- checkVal (ELVal arr)
+        case arrType of
+            TCArr inner -> return inner
+            _ -> typeError $ "only arrays can be indexed"
+    LRec record (Ident fieldName) -> do
+        recType <- checkVal (ELVal record)
+        case recType of 
+            TCRec fields -> case lookup fieldName fields of
+                Nothing -> typeError $ "record field does not exist: " ++ fieldName
+                Just fieldType -> return fieldType
+            _ -> typeError $ "operator -> can be used only with records, not " ++
+                show recType
 
-checkVal (EVar (Var (Ident label) val)) = typeError "Not yet implmemented"
+checkVal (EVar (Var (Ident label) val)) = do
+    valType <- checkVal val
+    return $ TCVar [(label, valType)]
 
 checkVal (ELitInt _) = return TCInt
 
@@ -642,27 +725,80 @@ checkVal  ELitFalse = return TCBool
 
 checkVal (EString _) = return TCString
 
-checkVal (EApp (Ident funName) args) = typeError "Not yet implmemented"
+checkVal (EApp (Ident funName) args) = do
+    fEnv <- gets tcFEnv
+    case lookup funName fEnv of
+        Nothing -> typeError $ "unkown function " ++ funName
+        Just (TCFun retType argTypes) -> return retType --TODO check args
 
-checkVal (EArr arr) = typeError "Not yet implmemented"
+checkVal (EArr arr) = mergeArr arr where
+    mergeArr [] = return $ TCArr TCAny
+    mergeArr (el:els) = do
+        elType <- checkVal el
+        (TCArr elsType) <- mergeArr els
+        commonType <- mergeTypes elType elsType
+        return $ TCArr commonType
 
-checkVal (ERec entries) = typeError "Not yet implmemented"
+checkVal (ERec entries) = getRecType entries where
+    getRecType [] = return $ TCRec []
+    getRecType ((RecEntry (Ident label) val):rest) = do
+        valType <- checkVal val
+        (TCRec restType) <- getRecType rest
+        return $ TCRec ((label, valType):restType)
 
-checkVal (Neg arg) = typeError "Not yet implmemented"
+checkVal (Neg arg) = checkValInt arg
 
-checkVal (Not arg) = typeError "Not yet implmemented"
+checkVal (Not arg) = checkValBool arg
 
-checkVal (EMul lhs op rhs) = typeError "Not yet implmemented"
+checkVal (EMul lhs op rhs) = do
+    checkValInt lhs
+    checkValInt rhs
 
-checkVal (EAdd lhs Plus rhs) = typeError "Not yet implmemented"
+checkVal (EAdd lhs Plus rhs) = do
+    lhsType <- checkVal lhs
+    case lhsType of
+        TCInt -> checkValInt rhs        
+        TCString -> checkValString rhs        
+        _        -> typeError $ "operator + can be used with int or string"
 
-checkVal (EAdd lhs Minus rhs) = typeError "Not yet implmemented"
+checkVal (EAdd lhs Minus rhs) = do
+    checkValInt lhs
+    checkValInt rhs
 
-checkVal (ERel lhs op rhs) = typeError "Not yet implmemented"
+checkVal (ERel lhs op rhs) = do
+    checkValInt lhs
+    checkValInt rhs
+    return TCBool
 
-checkVal (EBoolOp lhs op rhs) = typeError "Not yet implmemented"
+checkVal (EBoolOp lhs op rhs) = do
+    checkValBool lhs
+    checkValBool rhs
 
-checkVal (ECase val cases) = typeError "Not yet implmemented"
+checkVal (ECase var cases) = do
+    varType <- checkVal var
+    case varType of
+        TCVar caseTypes -> do
+            commonCases <- checkCases cases caseTypes
+            return commonCases
+        _ -> typeError "case argument has to be variant"
+    where
+        checkCases :: [CaseEntry] -> [(String, TCType)] -> TypeCheck TCType
+        checkCases [] _ = return TCAny
+        checkCases (caseEntry @ (CaseEntry _ _):cases) caseTypes = do
+            caseType <- checkCase caseEntry caseTypes
+            casesType <- checkCases cases caseTypes
+            commonCases <- mergeTypes caseType casesType
+            return commonCases
+        checkCase (CaseEntry (VarEntry (Ident label) (Ident var)) val) innerTypes = do
+            case lookup label innerTypes of
+                Nothing -> typeError $ "unknown case :" ++ label
+                Just innerType -> do
+                    vEnv <- gets tcVEnv
+                    modify $ \s -> s { tcVEnv = replaceElemKey var innerType vEnv }
+                    caseType <- checkVal val
+                    modify $ \s -> s { tcVEnv = vEnv }
+                    return caseType
+
 
 -- Helper type checking functions
 
@@ -681,3 +817,74 @@ tcParseArgs :: [ArgDef] -> [TCArg]
 tcParseArgs args = map parseArg args where
     parseArg (ArgValDef argType (Ident argName)) = TCArgVal (tcParseType argType) argName
     parseArg (ArgRefDef argType (Ident argName)) = TCArgRef (tcParseType argType) argName
+
+checkValInt :: Val -> TypeCheck TCType
+checkValInt val = do
+    valType <- checkVal val
+    case valType of
+        TCInt -> return TCInt
+        _     -> typeError $ "expected int instead of " ++ (show valType)
+
+checkValBool :: Val -> TypeCheck TCType
+checkValBool val = do
+    valType <- checkVal val
+    case valType of
+        TCBool -> return TCBool
+        _     -> typeError $ "expected bool instead of " ++ (show valType)
+
+checkValString :: Val -> TypeCheck TCType
+checkValString val = do
+    valType <- checkVal val
+    case valType of
+        TCString -> return TCString
+        _     -> typeError $ "expected string instead of " ++ (show valType)
+
+
+mergeTypes :: TCType -> TCType -> TypeCheck TCType
+mergeTypes TCInt    TCInt    = return TCInt
+mergeTypes TCString TCString = return TCString
+mergeTypes TCBool   TCBool   = return TCBool
+mergeTypes TCVoid   TCVoid   = return TCVoid
+mergeTypes TCAny    right    = return right
+mergeTypes left     TCAny    = return left
+mergeTypes (TCTypeName lName) right = do
+    left <- getPreciseType (TCTypeName lName)
+    mergeTypes left right
+mergeTypes left (TCTypeName rName) = do
+    right <- getPreciseType (TCTypeName rName)
+    mergeTypes left right
+mergeTypes (TCArr lType) (TCArr rType) = do
+    innerType <- mergeTypes lType rType
+    return $ TCArr innerType
+mergeTypes (TCRec []) (TCRec []) = return $ TCRec []
+mergeTypes (TCRec ((lLabel, lType):lRest)) (TCRec rRec) = do
+    case lookup lLabel rRec of
+        Nothing    -> typeError $ "missing record field " ++ lLabel
+        Just rType -> do
+            commonType <- mergeTypes lType rType
+            (TCRec commonRest) <- mergeTypes (TCRec lRest)
+                (TCRec (filter (\(label, _) -> label /= lLabel) rRec))
+            return $ TCRec ((lLabel, commonType):commonRest)
+mergeTypes (TCVar []) (TCVar entries) = return $ TCVar entries
+mergeTypes (TCVar entries) (TCVar []) = return $ TCVar entries
+mergeTypes (TCVar ((lLabel, lType):lRest)) (TCVar rRec) = do
+    case lookup lLabel rRec of
+        Nothing    -> do
+            (TCVar commonRest) <- mergeTypes (TCVar lRest) (TCVar rRec)
+            return $ TCVar ((lLabel, lType):commonRest)
+        Just rType -> do
+            commonType <- mergeTypes lType rType
+            (TCVar commonRest) <- mergeTypes (TCVar lRest)
+                (TCVar (filter (\(label, _) -> label /= lLabel) rRec))
+            return $ TCVar ((lLabel, commonType):commonRest)
+mergeTypes left right = typeError $ "cannot merge types " ++ (show left) ++ " and " ++
+    (show right)
+
+getPreciseType :: TCType -> TypeCheck TCType
+getPreciseType t = case t of
+    TCTypeName name -> do
+        types <- gets tcTypes
+        case lookup name types of
+            Nothing -> typeError $ "unknown type " ++ name
+            Just realType -> getPreciseType realType
+    realType -> return realType

@@ -7,12 +7,12 @@ void main() {
 	my_variant var1 = :num(1);
 	my_variant var2 = :str("a");
 
-	var n = 0;
+	int n = 0;
 
 	string s = "";
 	s = case var1 of
 		| :num(n) -> ":num(" + int_to_string(n) + ")"
-		| :str(s) -> (":str(" + s + ")");
+		| :str(s) -> ":str(" + s + ")";
 	print(s);
 
 	s = case var2 of

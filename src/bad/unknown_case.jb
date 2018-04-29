@@ -1,6 +1,5 @@
 variant {
 	int a;
-	int b;
 } my_variant;
 
 void main() {
