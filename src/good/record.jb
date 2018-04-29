@@ -2,7 +2,7 @@ record {
 	int num;
 } my_record;
 
-int main() {
+void main() {
 	my_record rec = <
 		num = 1;
 	>;

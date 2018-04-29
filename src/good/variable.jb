@@ -1,4 +1,4 @@
-int main() {
+void main() {
 	int x = 1;
 	string y = "a";
 	bool z = true;

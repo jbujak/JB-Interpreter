@@ -2,7 +2,7 @@ record {
 	string a;
 } my_record;
 
-int main() {
+void main() {
 	my_record rec = <
 		a = "x";
 	>;

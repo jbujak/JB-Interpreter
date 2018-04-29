@@ -6,7 +6,7 @@ void g() {
     print("g()");
 }
 
-int main() {
+void main() {
     print("main()");
     int i = 0;
     int j = 0;

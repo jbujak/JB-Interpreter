@@ -1,4 +1,4 @@
-int main() {
+void main() {
 	print(int_to_string(-1));
 	print(int_to_string(1));
 	print(int_to_string(1 + 1));

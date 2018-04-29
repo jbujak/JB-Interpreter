@@ -2,7 +2,7 @@ int f() {
 	print(s);
 }
 
-int main() {
+void main() {
 	string s = "asdf";
 	f();
 }

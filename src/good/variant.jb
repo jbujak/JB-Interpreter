@@ -3,7 +3,7 @@ variant {
 	string str;
 } my_variant;
 
-int main() {
+void main() {
 	my_variant var1 = :num(1);
 	my_variant var2 = :str("a");
 

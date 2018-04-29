@@ -1,4 +1,4 @@
-int main() {
+void main() {
 	while (true) as existent {
 		continue nonexistent;
 	}

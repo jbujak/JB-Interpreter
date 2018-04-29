@@ -6,7 +6,7 @@ int f(int a, int *b) {
 	print("b=" + int_to_string(b));
 }
 
-int main() {
+void main() {
 	int a = 1;
 	int b = 10;
 	f(b, &a);

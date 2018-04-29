@@ -1,4 +1,4 @@
-int main() {
+void main() {
 	print("neg");
 	print(bool_to_string(!false));
 	print(bool_to_string(!true));

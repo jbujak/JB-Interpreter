@@ -1,4 +1,4 @@
-int main() {
+void main() {
 	[int] arr = [1, 2, 3];
 	print(int_to_string(arr[1]));
 

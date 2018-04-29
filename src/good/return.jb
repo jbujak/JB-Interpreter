@@ -19,7 +19,7 @@ void x() {
 	print("unreachable");
 }
 
-int main() {
+void main() {
 	print(int_to_string(f()));
 	print(g());
 	print(bool_to_string(h()));

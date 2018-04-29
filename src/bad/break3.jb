@@ -2,6 +2,6 @@ void f() {
 	break;
 }
 
-int main() {
+void main() {
 	f();
 }
