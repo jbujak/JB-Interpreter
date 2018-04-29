@@ -754,7 +754,7 @@ checkVal (EApp (Ident funName) args) = do
                 argType <- checkVal (ELVal (LVar varName))
                 mergeTypes expectedType argType
                 checkArgs argTypes args
-            checkArgs _ _ = typeError $ "argument passing style do not match definition"
+            checkArgs _ _ = typeError $ "function arguments do not match definition"
 
 checkVal (EArr arr) = mergeArr arr where
     mergeArr [] = return $ TCArr TCAny
