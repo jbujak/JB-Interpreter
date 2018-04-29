@@ -24,4 +24,4 @@ clean:
 
 .PHONY: test
 test:
-	cd test && ./test.sh
+	./test.sh

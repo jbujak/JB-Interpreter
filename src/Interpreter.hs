@@ -63,7 +63,7 @@ execute code = case tryExecute code of
     Error partResult errorMSg -> do
         putStr partResult
         hPutStrLn stderr $ "Execution error: " ++ errorMSg
-        exitWith $ ExitFailure 1
+        exitWith $ ExitFailure 255
 
 tryExecute :: String -> Result String
 tryExecute s = do
