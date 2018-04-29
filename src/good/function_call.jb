@@ -1,0 +1,23 @@
+void f() {
+    print("f()");
+}
+
+void g() {
+    print("g()");
+}
+
+int main() {
+    print("main()");
+    int i = 0;
+    int j = 0;
+    void h() {
+        int i = 0;
+        i++;
+        j++;
+        print("h(): i=" + int_to_string(i) + " j=" + int_to_string(j));
+    }
+    f();
+    g();
+    h();
+    print("main(): i=" + int_to_string(i) + " j=" + int_to_string(j));
+}

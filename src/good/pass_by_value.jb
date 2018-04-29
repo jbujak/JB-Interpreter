@@ -1,0 +1,15 @@
+int f(int a, int b) {
+	print("f(" + int_to_string(a) + ", " + int_to_string(b) + ")");
+	a--;
+	b++;
+	print("a=" + int_to_string(a));
+	print("b=" + int_to_string(b));
+}
+
+int main() {
+	int a = 1;
+	int b = 10;
+	f(b, a);
+	print("a=" + int_to_string(a));
+	print("b=" + int_to_string(b));
+}

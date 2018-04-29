@@ -1,0 +1,8 @@
+int f() {
+	print(s);
+}
+
+int main() {
+	string s = "asdf";
+	f();
+}

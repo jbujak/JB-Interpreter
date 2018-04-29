@@ -16,15 +16,22 @@ data SVar = VInt Integer | VBool Bool | VString String | VVoid | VArr [SVar] |
 
 data BreakContinue = BCNone | BNearest | CNearest | BLabel String | CLabel String
 
-type Loc = Integer
-type Fun = ([SVar] -> SVar)
+type FEnv = [(String, Fun)]
+data Fun = Fun {
+    fValArgs :: [String],
+    fRefArgs :: [String],
+    fStmt :: Stmt,
+    fVEnv :: VEnv
+}
 
 type VEnv  = [(String, Loc)]
 type Store = [(Loc, Maybe SVar)]
+type Loc = Integer
 
 
 data ExecState = ExecState {
     vEnv :: VEnv,
+    fEnv :: FEnv,
     store :: Store,
     output :: String,
     location :: Integer,
@@ -84,6 +91,7 @@ runInterp m = fmap (output . snd) $ runStateT m emptyExecState
 emptyExecState :: ExecState
 emptyExecState = ExecState {
     vEnv = [],
+    fEnv = [],
     store = [],
     output = "",
     location = 0,
@@ -96,19 +104,63 @@ interpretProgram :: Program -> Interp ()
 interpretProgram (Program topDefs) = forM_ topDefs interpretTopDef
 
 interpretTopDef :: TopDef -> Interp ()
-interpretTopDef (TypeFnDef funType (Ident "main") args block) = do
+interpretTopDef (FnDef funType (Ident "main") args block) = do
     interpretStmt (BStmt block)
     breakContinue <- gets breakContinue
     case breakContinue of
         BCNone -> return ()
-        _    -> reportError "End of function reached during break/continue"
+        _    -> reportError "end of function reached during break/continue"
 
-interpretTopDef (TypeFnDef funType (Ident funName) args (Block cmds)) = return () --TODO
+interpretTopDef funDef @ (FnDef _ _ _ _) = addFun funDef
 
 interpretTopDef (RecordDef _ _) = return ()
 
 interpretTopDef (VariantDef _ _) = return ()
 
+
+addFun :: TopDef -> Interp ()
+addFun (FnDef _ (Ident funName) args block) = do
+    fEnv <- gets fEnv
+    vEnv <- gets vEnv
+    case lookup funName fEnv of
+        Just _  -> reportError $ "multiple function definitions: " ++ funName
+        Nothing -> modify $ \s -> s { fEnv = newFEnv }
+            where newFEnv = replaceElemKey funName (Fun {
+                    fValArgs = parseArgs valArgs,
+                    fRefArgs = parseArgs refArgs,
+                    fStmt = BStmt block,
+                    fVEnv = vEnv
+                }) fEnv
+                  parseArgs args = map parseArg args
+                  parseArg (ArgValDef _ (Ident argName)) = argName
+                  parseArg (ArgRefDef _ (Ident argName)) = argName
+                  valArgs = filter isVal args
+                  refArgs = filter (not . isVal) args
+                  isVal arg = case arg of (ArgValDef _ _) -> True; (ArgRefDef _ _) -> False
+
+execFun :: Fun -> [SVar] -> [Loc] -> Interp SVar
+execFun f valArgs refArgs = do
+    vEnv <- gets vEnv
+    modify $ \s -> s { vEnv = fVEnv f }
+    addValArgs (fValArgs f) valArgs
+    addRefArgs (fRefArgs f) refArgs
+    interpretStmt $ fStmt f
+    modify $ \s -> s { vEnv = vEnv }
+    return VVoid
+
+addValArgs :: [String] -> [SVar] -> Interp ()
+addValArgs [] [] = return ()
+addValArgs (name:names) (var:vars) = do
+    newVar name (Just var)
+    addValArgs names vars
+addValArgs a b = reportError $ (show a) ++ " " ++ (show b)
+
+addRefArgs :: [String] -> [Loc] -> Interp ()
+addRefArgs [] [] = return ()
+addRefArgs (name:names) (loc:locs) = do
+    setVarLoc name loc
+    addRefArgs names locs
+addRefArgs a b = reportError $ (show a) ++ " " ++ (show b)
 
 -- Interpreting statements
 
@@ -118,7 +170,7 @@ interpretStmt (BStmt (Block stmts)) = do
     executeStmts stmts
     modify $ \s -> s { vEnv = env }
 
-interpretStmt (FStmt funDef) = reportError "Not yet implemented FStmt"
+interpretStmt (FStmt funDef) = addFun funDef
 
 interpretStmt (Cond cond ifStmt) = do
     condBool <- calculateBool cond
@@ -222,7 +274,19 @@ interpretVal (EString str) = return $ VString str
 
 interpretVal (EApp (Ident funName) args) = if isBuiltIn funName
     then executeBuiltIn funName args
-    else reportError $ "Not yet implemented EApp " ++ funName
+    else do
+        fEnv <- gets fEnv
+        case lookup funName fEnv of
+            Nothing -> reportError $ "unknown function: " ++ funName
+            Just f  -> do
+                valArgs <- forM (map (\(ArgVal val) -> val) valArgsRaw) interpretVal
+                refArgs <- forM (map (\(ArgRef (Ident varName)) -> varName) refArgsRaw)
+                    getVarLoc
+                execFun f valArgs refArgs >>= return
+            where
+                valArgsRaw = filter isValArg args
+                refArgsRaw = filter (not . isValArg) args
+                isValArg arg = case arg of ArgVal _ -> True; ArgRef _ -> False
 
 interpretVal (EArr arr) = do
     values <- mapM interpretVal arr
@@ -447,6 +511,9 @@ getVarLoc name = do
     case lookup name env of
         Nothing  -> reportError $ "unknown variable: " ++  name
         Just loc -> return loc
+
+setVarLoc :: String -> Loc -> Interp ()
+setVarLoc name loc = modify $ \s -> s { vEnv = replaceElemKey name loc (vEnv s) }
 
 getNewLoc :: Interp Integer
 getNewLoc = do

@@ -4,9 +4,7 @@ entrypoints Program ;
 
 Program.    Program ::= [TopDef] ;
 
-TypeFnDef.  TopDef ::= Type Ident "(" [Arg] ")" Block ;
-
-VoidFnDef.  TopDef ::= "void" Ident "(" [Arg] ")" Block ;
+FnDef.      TopDef ::= Type Ident "(" [ArgDef] ")" Block ;
 
 RecordDef.  TopDef ::= "record" "{" [TypeEntry] "}" Ident ";";
 
@@ -18,9 +16,11 @@ terminator nonempty TypeEntry ";" ;
 
 separator nonempty TopDef "" ;
 
-Arg. 	    Arg ::= Type Ident;
+ArgValDef.  ArgDef ::= Type Ident ;
 
-separator   Arg "," ;
+ArgRefDef.  ArgDef ::= Type "*" Ident ;
+
+separator   ArgDef "," ;
 
 -- statements ----------------------------------------------
 
@@ -72,6 +72,8 @@ Bool.       Type ::= "bool" ;
 
 Str.        Type ::= "string" ;
 
+Void.       Type ::= "void" ;
+
 UserType.   Type ::= Ident ;
 
 Array.      Type ::= "[" Type "]" ;
@@ -113,7 +115,9 @@ Var.        Var ::= ":" Ident "(" Val ")" ;
 
 ArgVal.     Arg ::= Val ;
 
-ArgRef.     Arg ::= "&" Val ;
+ArgRef.     Arg ::= "&" Ident ;
+
+separator   Arg "," ;
 
 RecEntry.   RecEntry ::= Ident "=" Val ;
 
