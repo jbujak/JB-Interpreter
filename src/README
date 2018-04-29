@@ -1,0 +1,37 @@
+Building and running interpreter
+--------------------------------
+
+Building:
+	`make`
+Running tests:
+	`make test`
+Executing interpreter with custom program:
+	`./interpreter program.jb`
+
+Tests included are divided into two parts -- good and bad -- according to task.
+* Good programs are tested by checking both exit code and stdout.
+  To pass the test program has to return with exit code 0 and its stdout has to
+  match contents of corresponding *.out file.
+* Bad programs are only tested if their exit code is equal to interpreter error code (255).
+  For each such test interpreter message is printed and can be manually checked if it
+  matches expectations.
+
+
+Description of solution
+-----------------------
+
+
+Differences between language declaration and actual implementation
+------------------------------------------------------------------
+
+* During implementation I realized that passing arbitrary value by reference does not
+  make sense in general (for example f(&1)), so I decided to restrict passing by
+  reference only to variables.
+* Minor syntactic change: to avoid parsing conflicts I changed records initializing
+  syntax from
+  `my_record a = { numer => 1; };`
+  to
+  `my_record a = < numer => 1; >;`
+
+Program which corresponds to example program from language declaration, including
+changes specified above, is included in file good/example.jb.
