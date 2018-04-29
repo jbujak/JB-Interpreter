@@ -81,6 +81,7 @@ execute code = case tryExecute code of
 tryExecute :: String -> Result String
 tryExecute s = do
     ast <- parse s
+    runCheck  $ checkProgram ast
     runInterp $ interpretProgram ast
 
 parse :: String -> Result Program
@@ -457,7 +458,7 @@ executeBuiltIn "bool_to_string" args = case args of
                 \ passed by value"
 
 
--- Helper functions
+-- Helper interpreter functions
 calculateInt :: Val -> Interp Integer
 calculateInt val = interpretVal val >>= getInt
 
@@ -539,3 +540,144 @@ replaceElemIndex integer new list = (take n list) ++ (new:(drop (n+1) list)) whe
 
 replaceElemKey :: Eq a => a -> b -> [(a, b)] -> [(a, b)]
 replaceElemKey key val list = (key, val):(filter (\x -> fst x /= key) list)
+
+
+-- Type checking
+
+data TCType = TCInt | TCBool | TCString | TCVoid | TCArr TCType |
+        TCRec [(String, TCType)] | TCVar [(String, TCType)] | TCTypeName String
+        deriving (Show, Eq)
+
+data TCState = TCState {
+    tcVEnv :: [(String, TCType)],
+    tcFEnv :: [(String, TCFun)],
+    tcTypes :: [(String, TCType)]
+}
+
+data TCFun = TCFun TCType [TCArg]
+data TCArg = TCArgVal TCType String | TCArgRef TCType String
+
+
+type TypeCheck a = (StateT TCState Result) a
+
+runCheck :: TypeCheck () -> Result ()
+runCheck m = fmap (\_ -> ()) $ runStateT m emptyTCState
+
+emptyTCState :: TCState
+emptyTCState = TCState {
+    tcVEnv = [],
+    tcFEnv = [],
+    tcTypes = []
+}
+
+checkProgram :: Program -> TypeCheck ()
+checkProgram (Program topDefs) = forM_ topDefs checkTopDef
+
+checkTopDef :: TopDef -> TypeCheck ()
+checkTopDef funDef @ (FnDef _ _ _ _) = tcAddFunDef funDef
+
+-- Type checking in statements
+
+checkStmt :: Stmt -> TypeCheck ()
+checkStmt (BStmt (Block stmts)) = do
+    vEnv <- gets tcVEnv
+    fEnv <- gets tcFEnv
+    forM_ stmts checkStmt
+    modify $ \s -> s { tcVEnv = vEnv, tcFEnv = fEnv }
+
+checkStmt (FStmt funDef) = tcAddFunDef funDef
+
+checkStmt (Cond cond ifStmt) = typeError "Not yet implemented"
+
+checkStmt (CondElse cond ifStmt elseStmt) = typeError "Not yet implemented"
+
+checkStmt (While cond stmt) = typeError "Not yet implemented"
+
+checkStmt (WhileAs cond _ stmt) = typeError "Not yet implemented"
+
+checkStmt  Break = return ()
+
+checkStmt (BreakL _) = return ()
+
+checkStmt  Continue = return ()
+
+checkStmt (ContinueL _) = return ()
+
+checkStmt (Ret val) = typeError "Not yet implemented"
+
+checkStmt VRet = typeError "Not yet implemented"
+
+checkStmt (VarDecl _ item) = typeError "Not yet implemented"
+
+checkStmt (BinMod lval AssOp arg) = typeError "Not yet implemented"
+
+checkStmt (BinMod lval PlusEq rval) = typeError "Not yet implemented"
+
+checkStmt (BinMod lval op val) = typeError "Not yet implemented"
+
+checkStmt (UnMod lval op) = typeError "Not yet implemented"
+
+checkStmt (ValStmt val) = checkVal val >> return ()
+
+tcAddFunDef :: TopDef -> TypeCheck ()
+tcAddFunDef (FnDef retType (Ident funName) args stmt) = do
+    modify $ \s -> s {
+        tcFEnv = (funName, TCFun (tcParseType retType) (tcParseArgs args)):(tcFEnv s)
+    }
+    checkStmt $ BStmt stmt
+
+
+-- Type cheking in values
+
+checkVal :: Val -> TypeCheck TCType
+checkVal (ELVal lval) = typeError "Not yet implmemented"
+
+checkVal (EVar (Var (Ident label) val)) = typeError "Not yet implmemented"
+
+checkVal (ELitInt _) = return TCInt
+
+checkVal  ELitTrue = return TCBool
+
+checkVal  ELitFalse = return TCBool
+
+checkVal (EString _) = return TCString
+
+checkVal (EApp (Ident funName) args) = typeError "Not yet implmemented"
+
+checkVal (EArr arr) = typeError "Not yet implmemented"
+
+checkVal (ERec entries) = typeError "Not yet implmemented"
+
+checkVal (Neg arg) = typeError "Not yet implmemented"
+
+checkVal (Not arg) = typeError "Not yet implmemented"
+
+checkVal (EMul lhs op rhs) = typeError "Not yet implmemented"
+
+checkVal (EAdd lhs Plus rhs) = typeError "Not yet implmemented"
+
+checkVal (EAdd lhs Minus rhs) = typeError "Not yet implmemented"
+
+checkVal (ERel lhs op rhs) = typeError "Not yet implmemented"
+
+checkVal (EBoolOp lhs op rhs) = typeError "Not yet implmemented"
+
+checkVal (ECase val cases) = typeError "Not yet implmemented"
+
+-- Helper type checking functions
+
+typeError :: String -> TypeCheck a
+typeError msg = StateT { runStateT = \s -> Error TypeError "" msg }
+
+tcParseType :: Type -> TCType
+tcParseType Int = TCInt
+tcParseType Bool = TCBool
+tcParseType Str = TCString
+tcParseType Void = TCVoid
+tcParseType (UserType (Ident name)) = TCTypeName name
+tcParseType (Array innerType) = TCArr (tcParseType innerType)
+
+tcParseArgs :: [ArgDef] -> [TCArg]
+tcParseArgs args = map parseArg args where
+    parseArg (ArgValDef argType (Ident argName)) = TCArgVal (tcParseType argType) argName
+    parseArg (ArgRefDef argType (Ident argName)) = TCArgRef (tcParseType argType) argName
