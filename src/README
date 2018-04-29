@@ -20,6 +20,37 @@ Tests included are divided into two parts -- good and bad -- according to task.
 Description of solution
 -----------------------
 
+Intepretation of program happends in three stages.
+
+Firstly, source code is parsed to AST. Code resposible for parsing is generated
+automaticaly by bnfc from grammar save in file bnfc/Grammar.cf.
+
+After succesfull parsing, type checking is conducted. Type cheker maintains state
+with four elements:
+* tcVEnv -- mapping from variable names to their corresponding types
+* tcFEnv -- list of functions visible at given moment
+* tcTypes -- list of types defines by user so far
+* rcRetType -- return type of currently checked function
+
+During checking, information above is used to determine correctness of all
+statements and values. Most of type checking is pretty straightforward, although
+due to non trivial type system of my language there was a need to introduce quite
+complicated function `mergeTypes`. Its purpose is to find the smallest
+type, which is a superset of two given types or signalize that no such type exists.
+For example, if two records have the same field sets, then their merge type is
+a record with the same fields sets, where type of each field if merge of its types
+from both records.
+
+Finally, if type checking finished with success, proper interpretation begins.
+Interpreter state contains environments of variables and functions,
+current break/continue/return state, first not used location, store for storing variables
+and output produced so far by program. After all instructions are interpreted, the output
+is printer to stdout.
+
+I chose this approach, beacuse it seems elegant to me that IO () monad is used only
+in top-level function and is not present in interpreter logic. The downside is that
+if program enters infinite loop, then no output is produced at all.
+
 
 Differences between language declaration and actual implementation
 ------------------------------------------------------------------
