@@ -1,0 +1,9 @@
+record {
+    bool a;
+} my_rec;
+
+int main() {
+    my_rec rec = <
+        a = 1;
+    >;
+}

@@ -1,0 +1,7 @@
+variant {
+	string str;
+} my_var;
+
+int main() {
+	my_var var = :str(true);
+}

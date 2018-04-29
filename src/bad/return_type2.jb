@@ -1,0 +1,6 @@
+bool f() {
+	return "asdf";
+}
+
+int main() {
+}

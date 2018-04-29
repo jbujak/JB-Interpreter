@@ -244,7 +244,7 @@ interpretStmt (BinMod lval PlusEq rval) = do
 
 interpretStmt (BinMod lval op val) = do
     valInt <- calculateInt val
-    if op == DivEq && valInt == 0 then executionError "Cannot divide by zero"
+    if op == DivEq && valInt == 0 then executionError "cannot divide by zero"
     else modifyLVal lval $ modifyInt (funMod valInt) where
         funMod valInt = case op of
             MinusEq -> \n -> n - valInt
@@ -322,9 +322,9 @@ interpretVal (EMul lhs op rhs) = do
     rhsInt <- calculateInt rhs
     case op of
         Times -> return $ VInt (lhsInt * rhsInt)
-        Mod   -> if rhsInt == 0 then executionError "Cannot divide by zero"
+        Mod   -> if rhsInt == 0 then executionError "cannot divide by zero"
                                 else return $ VInt (lhsInt `mod` rhsInt)
-        Div   -> if rhsInt == 0 then executionError "Cannot divide by zero"
+        Div   -> if rhsInt == 0 then executionError "cannot divide by zero"
                                 else return $ VInt (lhsInt `div` rhsInt)
 
 interpretVal (EAdd lhs Plus rhs) = do
@@ -398,7 +398,7 @@ modifyLVal (LArr arr index) f = do
     (VArr arrayVal) <- calculateLVal arr
     indexInt <- calculateInt index
     if indexInt >= toInteger (length arrayVal)
-    then executionError $ "Array index out of bounds: " ++ show indexInt
+    then executionError $ "array index out of bounds: " ++ show indexInt
     else do
         newElem <- f (arrayVal !! fromInteger indexInt)
         modifyLVal arr (\_ -> return $ VArr (replaceElemIndex indexInt newElem arrayVal))
@@ -419,7 +419,7 @@ calculateLVal (LArr arr index) = do
     (VArr arrayVal) <- calculateLVal arr
     indexInt <- calculateInt index
     if indexInt >= toInteger (length arrayVal)
-    then executionError $ "Array index out of bounds: " ++ show indexInt
+    then executionError $ "array index out of bounds: " ++ show indexInt
     else return (arrayVal !! fromInteger indexInt)
 
 calculateLVal (LRec record (Ident field)) = do
@@ -551,7 +551,8 @@ data TCType = TCInt | TCBool | TCString | TCVoid | TCArr TCType |
 data TCState = TCState {
     tcVEnv :: [(String, TCType)],
     tcFEnv :: [(String, TCFun)],
-    tcTypes :: [(String, TCType)]
+    tcTypes :: [(String, TCType)],
+    tcRetType :: Maybe TCType
 }
 
 data TCFun = TCFun TCType [TCArg]
@@ -567,7 +568,8 @@ emptyTCState :: TCState
 emptyTCState = TCState {
     tcVEnv = [],
     tcFEnv = getBuiltIns,
-    tcTypes = []
+    tcTypes = [],
+    tcRetType = Nothing
 }
 
 getBuiltIns :: [(String, TCFun)]
@@ -637,10 +639,19 @@ checkStmt  Continue = return ()
 checkStmt (ContinueL _) = return ()
 
 checkStmt (Ret val) = do
-    valType <- checkVal val --TODO check return value type
-    return ()
+    retType <- gets tcRetType
+    valType <- checkVal val
+    case retType of
+        Nothing -> typeError "return outside of function"
+        Just t  -> mergeTypes valType t >> return ()
 
-checkStmt VRet = return () --TODO check return value type
+checkStmt VRet = do
+    retType <- gets tcRetType
+    case retType of
+        Nothing -> typeError "return outside of function"
+        Just t -> case t of
+            TCVoid -> return ()
+            _      -> typeError "no return value in function"
 
 checkStmt (VarDecl varType (NoInit (Ident varName))) = do
     vEnv <- gets tcVEnv
@@ -678,7 +689,8 @@ tcAddFunDef :: TopDef -> TypeCheck ()
 tcAddFunDef (FnDef retType (Ident funName) args stmt) = do
     modify $ \s -> s {
         tcFEnv = (funName, TCFun (tcParseType retType) (tcParseArgs args)):(tcFEnv s),
-        tcVEnv = addArgs args (tcVEnv s)
+        tcVEnv = addArgs args (tcVEnv s),
+        tcRetType = Just (tcParseType retType)
     }
     checkStmt $ BStmt stmt
     where
@@ -729,7 +741,20 @@ checkVal (EApp (Ident funName) args) = do
     fEnv <- gets tcFEnv
     case lookup funName fEnv of
         Nothing -> typeError $ "unkown function " ++ funName
-        Just (TCFun retType argTypes) -> return retType --TODO check args
+        Just (TCFun retType argTypes) -> do
+            checkArgs argTypes args
+            return retType
+        where
+            checkArgs [] [] = return ()
+            checkArgs ((TCArgVal expectedType name):argTypes) ((ArgVal val):args) = do
+                argType <- checkVal val
+                mergeTypes expectedType argType
+                checkArgs argTypes args
+            checkArgs ((TCArgRef expectedType name):argTypes) ((ArgRef varName):args) = do
+                argType <- checkVal (ELVal (LVar varName))
+                mergeTypes expectedType argType
+                checkArgs argTypes args
+            checkArgs _ _ = typeError $ "argument passing style do not match definition"
 
 checkVal (EArr arr) = mergeArr arr where
     mergeArr [] = return $ TCArr TCAny
@@ -847,15 +872,18 @@ mergeTypes TCBool   TCBool   = return TCBool
 mergeTypes TCVoid   TCVoid   = return TCVoid
 mergeTypes TCAny    right    = return right
 mergeTypes left     TCAny    = return left
+
 mergeTypes (TCTypeName lName) right = do
     left <- getPreciseType (TCTypeName lName)
     mergeTypes left right
 mergeTypes left (TCTypeName rName) = do
     right <- getPreciseType (TCTypeName rName)
     mergeTypes left right
+
 mergeTypes (TCArr lType) (TCArr rType) = do
     innerType <- mergeTypes lType rType
     return $ TCArr innerType
+
 mergeTypes (TCRec []) (TCRec []) = return $ TCRec []
 mergeTypes (TCRec ((lLabel, lType):lRest)) (TCRec rRec) = do
     case lookup lLabel rRec of
@@ -865,6 +893,7 @@ mergeTypes (TCRec ((lLabel, lType):lRest)) (TCRec rRec) = do
             (TCRec commonRest) <- mergeTypes (TCRec lRest)
                 (TCRec (filter (\(label, _) -> label /= lLabel) rRec))
             return $ TCRec ((lLabel, commonType):commonRest)
+
 mergeTypes (TCVar []) (TCVar entries) = return $ TCVar entries
 mergeTypes (TCVar entries) (TCVar []) = return $ TCVar entries
 mergeTypes (TCVar ((lLabel, lType):lRest)) (TCVar rRec) = do
@@ -877,7 +906,8 @@ mergeTypes (TCVar ((lLabel, lType):lRest)) (TCVar rRec) = do
             (TCVar commonRest) <- mergeTypes (TCVar lRest)
                 (TCVar (filter (\(label, _) -> label /= lLabel) rRec))
             return $ TCVar ((lLabel, commonType):commonRest)
-mergeTypes left right = typeError $ "cannot merge types " ++ (show left) ++ " and " ++
+
+mergeTypes left right = typeError $ "incompatible types " ++ (show left) ++ " and " ++
     (show right)
 
 getPreciseType :: TCType -> TypeCheck TCType
