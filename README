@@ -1,5 +1,4 @@
-JB Interpreter
--------------
+# JB Interpreter
 JB is programming language designed for  Programming Languages and Paradigms university course.
 It has C like syntax and contains a few features I thought would be nice to implement:
 * Labeled loops, which allow to break out of nested loop at any level
@@ -7,9 +6,7 @@ It has C like syntax and contains a few features I thought would be nice to impl
 
 More specific description of language syntax and semantics is located in project.pdf.
 
-Building and running interpreter
---------------------------------
-
+# Building and running interpreter
 * Building interpreter:	`make`
 * Running tests: `make test`
 * Executing interpreter with custom program: `./interpreter good/example.jb`
@@ -23,9 +20,7 @@ Tests included are divided into two parts -- good and bad -- according to task.
   matches expectations.
 
 
-Description of solution
------------------------
-
+# Description of solution
 Interpretation of program happens in three stages.
 
 Firstly, source code is parsed to AST. Code responsible for parsing is generated
@@ -58,9 +53,7 @@ in top-level function and is not present in interpreter logic. The downside is t
 if program enters infinite loop, no output is produced at all.
 
 
-Differences between language declaration and actual implementation
-------------------------------------------------------------------
-
+# Differences between language declaration and actual implementation
 * During implementation I realized that passing arbitrary value by reference does not
   make sense in general (for example `f(&1)`), so I decided to restrict passing by
   reference only to variables.
