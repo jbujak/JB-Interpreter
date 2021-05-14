@@ -3,6 +3,7 @@ import System.Exit
 import System.Environment
 
 import Control.Monad.State
+import Control.Monad.Fail
 import Control.Applicative
 
 import ParGrammar
@@ -54,6 +55,9 @@ instance Functor Result where
 instance Applicative Result where
     pure = return
     (<*>) = ap
+
+instance MonadFail Result where
+    fail msg = Error ExecutionError "" msg
 
 type Interp a = (StateT ExecState Result) a
 
